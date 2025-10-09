@@ -150,12 +150,11 @@ export default function AdminDashboard() {
       });
     } else if (modalType === 'title') {
       if (formData.title.trim() && !customTitles.includes(formData.title.trim())) {
-        setCustomTitles(prev => {
+        setCustomTitles((prev: string[]) => {
           const updated = [...prev, formData.title.trim()];
           localStorage.setItem('customTitles', JSON.stringify(updated));
           return updated;
         });
-        console.log('Custom title added:', formData.title.trim());
       }
     }
 
