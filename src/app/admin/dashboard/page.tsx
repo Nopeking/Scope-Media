@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, Play, Pause, Upload, Users, Eye, Settings } from 'lucide-react';
+import { LiveStream, ArchivedVideo } from '@/types';
 
 // Initial data arrays - will be populated when content is added
-const initialLiveStreams: any[] = [];
-const initialArchivedVideos: any[] = [];
+const initialLiveStreams: LiveStream[] = [];
+const initialArchivedVideos: ArchivedVideo[] = [];
 const initialCustomTitles: string[] = ['Tech Conferences', 'Cooking Shows', 'Music Events'];
 
 export default function AdminDashboard() {
