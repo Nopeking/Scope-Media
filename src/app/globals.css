@@ -1,23 +1,6 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f6f7f8;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #101c22;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-}
-
+/* Custom scrollbar styles */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -25,4 +8,9 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
