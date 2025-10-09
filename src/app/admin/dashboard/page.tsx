@@ -126,12 +126,11 @@ export default function AdminDashboard() {
         date: new Date().toLocaleDateString()
       };
       
-      setLiveStreams(prev => {
+      setLiveStreams((prev: LiveStream[]) => {
         const updated = [...prev, newStream];
         localStorage.setItem('liveStreams', JSON.stringify(updated));
         return updated;
       });
-      console.log('Live stream added:', newStream);
     } else if (modalType === 'video') {
       const newVideo = {
         id: Date.now().toString(),
@@ -144,15 +143,11 @@ export default function AdminDashboard() {
         month: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       };
       
-      setArchivedVideos(prev => {
+      setArchivedVideos((prev: ArchivedVideo[]) => {
         const updated = [...prev, newVideo];
         localStorage.setItem('archivedVideos', JSON.stringify(updated));
         return updated;
       });
-      console.log('Archived video added:', newVideo);
-      console.log('Video URL:', newVideo.url);
-      console.log('Video URL type:', typeof newVideo.url);
-      console.log('Video URL length:', newVideo.url?.length);
     } else if (modalType === 'title') {
       if (formData.title.trim() && !customTitles.includes(formData.title.trim())) {
         setCustomTitles(prev => {
