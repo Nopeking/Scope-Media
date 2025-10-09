@@ -174,19 +174,19 @@ export default function AdminDashboard() {
   // Function to delete content
   const handleDeleteContent = (id: string, type: 'stream' | 'video' | 'title') => {
     if (type === 'stream') {
-      setLiveStreams(prev => {
+      setLiveStreams((prev: LiveStream[]) => {
         const updated = prev.filter(item => item.id !== id);
         localStorage.setItem('liveStreams', JSON.stringify(updated));
         return updated;
       });
     } else if (type === 'video') {
-      setArchivedVideos(prev => {
+      setArchivedVideos((prev: ArchivedVideo[]) => {
         const updated = prev.filter(item => item.id !== id);
         localStorage.setItem('archivedVideos', JSON.stringify(updated));
         return updated;
       });
     } else if (type === 'title') {
-      setCustomTitles(prev => {
+      setCustomTitles((prev: string[]) => {
         const updated = prev.filter(title => title !== id);
         localStorage.setItem('customTitles', JSON.stringify(updated));
         return updated;
