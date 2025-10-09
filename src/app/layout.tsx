@@ -12,6 +12,9 @@ const inter = Inter({
 export const metadata: Metadata = {
     title: "Scope Media",
     description: "Your one-stop destination for the best live streams and video content.",
+    icons: {
+      icon: '/favicon.ico',
+    },
 };
 
 export default function RootLayout({
