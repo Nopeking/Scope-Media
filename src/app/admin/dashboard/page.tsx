@@ -284,7 +284,7 @@ export default function AdminDashboard() {
                       </div>
                           <div suppressHydrationWarning>
                             <p className="text-sm text-slate-600">Total Viewers</p>
-                            <p className="text-2xl font-bold text-slate-800">{liveStreams.reduce((sum, stream) => sum + (stream.viewers || 0), 0)}</p>
+                            <p className="text-2xl font-bold text-slate-800">{liveStreams.reduce((sum: number, stream) => sum + (stream.viewers || 0), 0)}</p>
                           </div>
                     </div>
                   </div>

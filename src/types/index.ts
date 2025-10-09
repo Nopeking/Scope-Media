@@ -4,6 +4,7 @@ export interface LiveStream {
   url: string;
   status: string;
   thumbnail: string;
+  viewers?: number;
 }
 
 export interface ArchivedVideo {
