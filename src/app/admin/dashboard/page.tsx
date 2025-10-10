@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, Play, Pause, Upload, Users, Eye, Settings } from 'lucide-react';
 import { LiveStream, ArchivedVideo } from '@/types';
@@ -15,28 +15,11 @@ export default function AdminDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalType, setModalType] = useState('content'); // 'content', 'stream', 'video', 'title'
   
-  // State for managing content - load from localStorage on mount
-  const [liveStreams, setLiveStreams] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('liveStreams');
-      return stored ? JSON.parse(stored) : initialLiveStreams;
-    }
-    return initialLiveStreams;
-  });
-  const [archivedVideos, setArchivedVideos] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('archivedVideos');
-      return stored ? JSON.parse(stored) : initialArchivedVideos;
-    }
-    return initialArchivedVideos;
-  });
-  const [customTitles, setCustomTitles] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('customTitles');
-      return stored ? JSON.parse(stored) : initialCustomTitles;
-    }
-    return initialCustomTitles;
-  });
+  // State for managing content
+  const [liveStreams, setLiveStreams] = useState<LiveStream[]>(initialLiveStreams);
+  const [archivedVideos, setArchivedVideos] = useState<ArchivedVideo[]>(initialArchivedVideos);
+  const [customTitles, setCustomTitles] = useState<string[]>(initialCustomTitles);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -48,6 +31,34 @@ export default function AdminDashboard() {
   
   // File upload state
   const [uploadedThumbnail, setUploadedThumbnail] = useState<string | null>(null);
+
+  // Fetch data from API on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [streamsRes, videosRes, titlesRes] = await Promise.all([
+          fetch('/api/streams'),
+          fetch('/api/videos'),
+          fetch('/api/titles')
+        ]);
+        
+        const streams = await streamsRes.json();
+        const videos = await videosRes.json();
+        const titles = await titlesRes.json();
+        
+        setLiveStreams(streams);
+        setArchivedVideos(videos);
+        setCustomTitles(titles);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Eye },
@@ -96,7 +107,7 @@ export default function AdminDashboard() {
   };
 
   // Function to add new content
-  const handleAddContent = () => {
+  const handleAddContent = async () => {
     // Validate based on modal type
     if (modalType === 'stream') {
       if (!formData.title || !formData.url) {
@@ -115,6 +126,7 @@ export default function AdminDashboard() {
       }
     }
 
+    try {
     if (modalType === 'stream') {
       const newStream = {
         id: Date.now().toString(),
@@ -126,11 +138,15 @@ export default function AdminDashboard() {
         date: new Date().toLocaleDateString()
       };
       
-      setLiveStreams((prev: LiveStream[]) => {
-        const updated = [...prev, newStream];
-        localStorage.setItem('liveStreams', JSON.stringify(updated));
-        return updated;
-      });
+        const response = await fetch('/api/streams', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newStream)
+        });
+        
+        if (response.ok) {
+          setLiveStreams((prev: LiveStream[]) => [...prev, newStream]);
+        }
     } else if (modalType === 'video') {
       const newVideo = {
         id: Date.now().toString(),
@@ -143,25 +159,38 @@ export default function AdminDashboard() {
         month: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       };
       
-      setArchivedVideos((prev: ArchivedVideo[]) => {
-        const updated = [...prev, newVideo];
-        localStorage.setItem('archivedVideos', JSON.stringify(updated));
-        return updated;
-      });
+        const response = await fetch('/api/videos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newVideo)
+        });
+        
+        if (response.ok) {
+          setArchivedVideos((prev: ArchivedVideo[]) => [...prev, newVideo]);
+        }
     } else if (modalType === 'title') {
       if (formData.title.trim() && !customTitles.includes(formData.title.trim())) {
-        setCustomTitles((prev: string[]) => {
-          const updated = [...prev, formData.title.trim()];
-          localStorage.setItem('customTitles', JSON.stringify(updated));
-          return updated;
-        });
-      }
+          const response = await fetch('/api/titles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: formData.title.trim() })
+          });
+          
+          if (response.ok) {
+            const updatedTitles = await response.json();
+            setCustomTitles(updatedTitles);
+          }
+        }
     }
 
     // Reset form and close modal
     setFormData({ title: '', url: '', customTitle: '', thumbnail: '' });
     setUploadedThumbnail(null);
     setShowAddModal(false);
+    } catch (error) {
+      console.error('Error adding content:', error);
+      alert('Failed to add content. Please try again.');
+    }
   };
 
   // Function to extract YouTube video ID from URL
@@ -172,68 +201,92 @@ export default function AdminDashboard() {
   };
 
   // Function to delete content
-  const handleDeleteContent = (id: string, type: 'stream' | 'video' | 'title') => {
+  const handleDeleteContent = async (id: string, type: 'stream' | 'video' | 'title') => {
+    try {
     if (type === 'stream') {
-      setLiveStreams((prev: LiveStream[]) => {
-        const updated = prev.filter(item => item.id !== id);
-        localStorage.setItem('liveStreams', JSON.stringify(updated));
-        return updated;
-      });
+        const response = await fetch(`/api/streams?id=${id}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          setLiveStreams((prev: LiveStream[]) => prev.filter(item => item.id !== id));
+        }
     } else if (type === 'video') {
-      setArchivedVideos((prev: ArchivedVideo[]) => {
-        const updated = prev.filter(item => item.id !== id);
-        localStorage.setItem('archivedVideos', JSON.stringify(updated));
-        return updated;
-      });
+        const response = await fetch(`/api/videos?id=${id}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          setArchivedVideos((prev: ArchivedVideo[]) => prev.filter(item => item.id !== id));
+        }
     } else if (type === 'title') {
-      setCustomTitles((prev: string[]) => {
-        const updated = prev.filter(title => title !== id);
-        localStorage.setItem('customTitles', JSON.stringify(updated));
-        return updated;
-      });
+        const response = await fetch(`/api/titles?title=${encodeURIComponent(id)}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          setCustomTitles((prev: string[]) => prev.filter(title => title !== id));
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting content:', error);
+      alert('Failed to delete content. Please try again.');
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50" suppressHydrationWarning>
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-slate-200" suppressHydrationWarning>
-        <div className="container mx-auto px-4 py-4 sm:px-6 lg:px-8" suppressHydrationWarning>
-          <div className="flex items-center justify-between" suppressHydrationWarning>
-            <div className="flex items-center gap-3" suppressHydrationWarning>
+        <div className="container mx-auto px-4 py-3 sm:py-4 sm:px-6 lg:px-8" suppressHydrationWarning>
+          <div className="flex items-center justify-between gap-2" suppressHydrationWarning>
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0" suppressHydrationWarning>
               <img 
                 src="/logo.png" 
                 alt="Scope Media Logo" 
-                className="h-12 w-12 object-contain"
+                className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 object-contain flex-shrink-0"
               />
-                  <h1 className="text-2xl font-bold text-slate-800">Scope Media - Admin Dashboard</h1>
+              <h1 className="text-base sm:text-xl md:text-2xl font-bold text-slate-800 truncate">
+                Scope Media - Admin Dashboard
+              </h1>
             </div>
-            <button className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+            <button className="bg-primary hover:bg-primary/90 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors flex-shrink-0">
               Logout
             </button>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8" suppressHydrationWarning>
-        <div className="flex flex-col lg:flex-row gap-8" suppressHydrationWarning>
+      <div className="container mx-auto px-4 py-4 sm:py-8 sm:px-6 lg:px-8" suppressHydrationWarning>
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-8" suppressHydrationWarning>
           {/* Sidebar */}
           <aside className="lg:w-64" suppressHydrationWarning>
-            <nav className="space-y-2">
+            <nav className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 -mx-4 px-4 lg:mx-0 lg:px-0">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    className={`flex items-center gap-2 lg:gap-3 px-3 py-2 lg:px-4 lg:py-3 rounded-lg text-left transition-colors whitespace-nowrap flex-shrink-0 lg:w-full text-sm lg:text-base ${
                       activeTab === tab.id
                         ? 'bg-primary text-white'
                         : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <Icon className="h-5 w-5" />
-                    {tab.label}
+                    <Icon className="h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0" />
+                    <span>{tab.label}</span>
                   </button>
                 );
               })}
@@ -246,69 +299,69 @@ export default function AdminDashboard() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
+                className="space-y-4 sm:space-y-6"
               >
-                <div className="flex items-center justify-between" suppressHydrationWarning>
-                  <h2 className="text-3xl font-bold text-slate-800">Overview</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" suppressHydrationWarning>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Overview</h2>
                   <button
                     onClick={() => {
                       setModalType('content');
                       setShowAddModal(true);
                     }}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                     suppressHydrationWarning
                   >
-                    <Plus className="h-5 w-5" />
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                     Add Content
                   </button>
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" suppressHydrationWarning>
-                  <div className="bg-white p-6 rounded-xl shadow-sm" suppressHydrationWarning>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6" suppressHydrationWarning>
+                  <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm" suppressHydrationWarning>
                     <div className="flex items-center gap-3" suppressHydrationWarning>
-                      <div className="p-3 bg-green-100 rounded-lg" suppressHydrationWarning>
-                        <Play className="h-6 w-6 text-green-600" />
+                      <div className="p-2 sm:p-3 bg-green-100 rounded-lg flex-shrink-0" suppressHydrationWarning>
+                        <Play className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
                       </div>
                       <div suppressHydrationWarning>
-                        <p className="text-sm text-slate-600">Active Streams</p>
-                            <p className="text-2xl font-bold text-slate-800">{liveStreams.length}</p>
+                        <p className="text-xs sm:text-sm text-slate-600">Active Streams</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-800">{liveStreams.length}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl shadow-sm" suppressHydrationWarning>
+                  <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm" suppressHydrationWarning>
                     <div className="flex items-center gap-3" suppressHydrationWarning>
-                      <div className="p-3 bg-blue-100 rounded-lg" suppressHydrationWarning>
-                        <Eye className="h-6 w-6 text-blue-600" />
+                      <div className="p-2 sm:p-3 bg-blue-100 rounded-lg flex-shrink-0" suppressHydrationWarning>
+                        <Eye className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                       </div>
                           <div suppressHydrationWarning>
-                            <p className="text-sm text-slate-600">Total Viewers</p>
-                            <p className="text-2xl font-bold text-slate-800">{liveStreams.reduce((sum: number, stream) => sum + (stream.viewers || 0), 0)}</p>
+                        <p className="text-xs sm:text-sm text-slate-600">Total Viewers</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-800">{liveStreams.reduce((sum: number, stream) => sum + (stream.viewers || 0), 0)}</p>
                           </div>
                     </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl shadow-sm" suppressHydrationWarning>
+                  <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm" suppressHydrationWarning>
                     <div className="flex items-center gap-3" suppressHydrationWarning>
-                      <div className="p-3 bg-purple-100 rounded-lg" suppressHydrationWarning>
-                        <Pause className="h-6 w-6 text-purple-600" />
+                      <div className="p-2 sm:p-3 bg-purple-100 rounded-lg flex-shrink-0" suppressHydrationWarning>
+                        <Pause className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
                       </div>
                           <div suppressHydrationWarning>
-                            <p className="text-sm text-slate-600">Archived Videos</p>
-                            <p className="text-2xl font-bold text-slate-800">{archivedVideos.length}</p>
+                        <p className="text-xs sm:text-sm text-slate-600">Archived Videos</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-800">{archivedVideos.length}</p>
                           </div>
                     </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl shadow-sm" suppressHydrationWarning>
+                  <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm" suppressHydrationWarning>
                     <div className="flex items-center gap-3" suppressHydrationWarning>
-                      <div className="p-3 bg-orange-100 rounded-lg" suppressHydrationWarning>
-                        <Settings className="h-6 w-6 text-orange-600" />
+                      <div className="p-2 sm:p-3 bg-orange-100 rounded-lg flex-shrink-0" suppressHydrationWarning>
+                        <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
                       </div>
                           <div suppressHydrationWarning>
-                            <p className="text-sm text-slate-600">Custom Titles</p>
-                            <p className="text-2xl font-bold text-slate-800">{customTitles.length}</p>
+                        <p className="text-xs sm:text-sm text-slate-600">Custom Titles</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-800">{customTitles.length}</p>
                           </div>
                     </div>
                   </div>
@@ -320,40 +373,96 @@ export default function AdminDashboard() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
+                className="space-y-4 sm:space-y-6"
               >
-                <div className="flex items-center justify-between" suppressHydrationWarning>
-                  <h2 className="text-3xl font-bold text-slate-800">Live Streams</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" suppressHydrationWarning>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Live Streams</h2>
                   <button 
                     onClick={() => {
                       console.log('Add Stream button clicked!');
                       setModalType('stream');
                       setShowAddModal(true);
                     }}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                     suppressHydrationWarning
                   >
-                    <Plus className="h-5 w-5" />
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                     Add Stream
                   </button>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  <div className="overflow-x-auto">
+                  {/* Mobile Card View */}
+                  <div className="block md:hidden">
+                    {liveStreams.length === 0 ? (
+                      <div className="p-6 text-center text-slate-500">
+                        No live streams yet. Click "Add Stream" to create one.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-200">
+                        {liveStreams.map((stream) => (
+                          <div key={stream.id} className="p-4">
+                            <div className="flex items-start gap-3">
+                              <img 
+                                src={stream.thumbnail} 
+                                alt={stream.title}
+                                className="w-20 h-14 object-cover rounded flex-shrink-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-slate-900 truncate">{stream.title}</h3>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    stream.status === 'live' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {stream.status}
+                                  </span>
+                                  <span className="text-xs text-slate-500">{(stream.viewers || 0).toLocaleString()} viewers</span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1 truncate">{stream.url}</p>
+                              </div>
+                              <div className="flex flex-col gap-2 flex-shrink-0">
+                                <button className="text-blue-500 hover:text-blue-700 p-1">
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteContent(stream.id, 'stream')}
+                                  className="text-red-600 hover:text-red-500 p-1"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-slate-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Title</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Viewers</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">RTMP URL</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                          <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Title</th>
+                          <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                          <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Viewers</th>
+                          <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">RTMP URL</th>
+                          <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
                           <tbody className="divide-y divide-slate-200">
-                            {liveStreams.map((stream) => (
+                        {liveStreams.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                              No live streams yet. Click "Add Stream" to create one.
+                            </td>
+                          </tr>
+                        ) : (
+                          liveStreams.map((stream) => (
                           <tr key={stream.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                              <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                               <div className="flex items-center gap-3">
                                 <img 
                                   src={stream.thumbnail} 
@@ -363,7 +472,7 @@ export default function AdminDashboard() {
                                 {stream.title}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                 stream.status === 'live' 
                                   ? 'bg-green-100 text-green-800' 
@@ -372,13 +481,13 @@ export default function AdminDashboard() {
                                 {stream.status}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                              {stream.viewers.toLocaleString()}
+                              <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                                {(stream.viewers || 0).toLocaleString()}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                              <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-slate-500 max-w-xs truncate">
                               {stream.url}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                              <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                               <div className="flex items-center gap-2">
                                 <button className="text-blue-500 hover:text-blue-700">
                                   <Edit className="h-4 w-4" />
@@ -392,7 +501,8 @@ export default function AdminDashboard() {
                               </div>
                             </td>
                           </tr>
-                        ))}
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -404,57 +514,61 @@ export default function AdminDashboard() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
+                className="space-y-4 sm:space-y-6"
               >
-                <div className="flex items-center justify-between" suppressHydrationWarning>
-                  <h2 className="text-3xl font-bold text-slate-800">Archived Videos</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" suppressHydrationWarning>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Archived Videos</h2>
                   <button 
                     onClick={() => {
                       console.log('Upload Video button clicked!');
                       setModalType('video');
                       setShowAddModal(true);
                     }}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                     suppressHydrationWarning
                   >
-                    <Upload className="h-5 w-5" />
+                    <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
                     Upload Video
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                  {archivedVideos.map((video) => (
-                    <div key={video.id} className="bg-white p-6 rounded-xl shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 flex-1">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                  {archivedVideos.length === 0 ? (
+                    <div className="bg-white p-6 rounded-xl shadow-sm text-center text-slate-500">
+                      No archived videos yet. Click "Upload Video" to add one.
+                    </div>
+                  ) : (
+                    archivedVideos.map((video) => (
+                      <div key={video.id} className="bg-white p-4 sm:p-6 rounded-xl shadow-sm">
+                        <div className="flex items-start gap-3 sm:gap-4">
                           <img 
                             src={video.thumbnail} 
                             alt={video.title}
-                            className="w-16 h-12 object-cover rounded-lg"
+                            className="w-20 h-14 sm:w-24 sm:h-16 object-cover rounded-lg flex-shrink-0"
                           />
-                          <div>
-                            <h3 className="text-lg font-semibold text-slate-800">{video.title}</h3>
-                            <div className="flex items-center gap-4 mt-2 text-sm text-slate-600">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-base sm:text-lg font-semibold text-slate-800 truncate">{video.title}</h3>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-2 text-xs sm:text-sm text-slate-600">
                               <span>Duration: {video.duration}</span>
                               <span>Uploaded: {video.uploadDate}</span>
-                              <span>Group: {video.customTitle}</span>
+                              <span className="truncate">Group: {video.customTitle}</span>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button className="text-blue-500 hover:text-blue-700">
-                          <Edit className="h-5 w-5" />
+                          <div className="flex flex-col sm:flex-row items-center gap-2 flex-shrink-0">
+                            <button className="text-blue-500 hover:text-blue-700 p-1">
+                              <Edit className="h-4 w-4 sm:h-5 sm:w-5" />
                         </button>
                         <button 
                           onClick={() => handleDeleteContent(video.id, 'video')}
-                          className="text-red-600 hover:text-red-500"
+                              className="text-red-600 hover:text-red-500 p-1"
                         >
-                          <Trash2 className="h-5 w-5" />
+                              <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
                         </button>
                       </div>
                     </div>
-                  ))}
+                      </div>
+                    ))
+                  )}
                 </div>
               </motion.div>
             )}
