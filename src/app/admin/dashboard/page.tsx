@@ -127,17 +127,17 @@ export default function AdminDashboard() {
     }
 
     try {
-    if (modalType === 'stream') {
-      const newStream = {
-        id: Date.now().toString(),
-        title: formData.title,
-        url: formData.url,
-        thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
-        status: 'live',
-        viewers: Math.floor(Math.random() * 1000) + 100,
-        date: new Date().toLocaleDateString()
-      };
-      
+      if (modalType === 'stream') {
+        const newStream = {
+          id: Date.now().toString(),
+          title: formData.title,
+          url: formData.url,
+          thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
+          status: 'live',
+          viewers: Math.floor(Math.random() * 1000) + 100,
+          date: new Date().toLocaleDateString()
+        };
+        
         const response = await fetch('/api/streams', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -145,20 +145,23 @@ export default function AdminDashboard() {
         });
         
         if (response.ok) {
-          setLiveStreams((prev: LiveStream[]) => [...prev, newStream]);
+          setLiveStreams((prev: LiveStream[]) => [newStream, ...prev]);
+          console.log('✅ Stream added to UI');
+        } else {
+          throw new Error('Failed to add stream');
         }
-    } else if (modalType === 'video') {
-      const newVideo = {
-        id: Date.now().toString(),
-        title: formData.title,
-        url: formData.url,
-        thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
-        duration: '00:00', // Placeholder, ideally fetched from YouTube API
-        uploadDate: new Date().toLocaleDateString(),
-        customTitle: formData.customTitle,
-        month: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-      };
-      
+      } else if (modalType === 'video') {
+        const newVideo = {
+          id: Date.now().toString(),
+          title: formData.title,
+          url: formData.url,
+          thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
+          duration: '00:00', // Placeholder, ideally fetched from YouTube API
+          uploadDate: new Date().toLocaleDateString(),
+          customTitle: formData.customTitle,
+          month: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        };
+        
         const response = await fetch('/api/videos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -166,10 +169,13 @@ export default function AdminDashboard() {
         });
         
         if (response.ok) {
-          setArchivedVideos((prev: ArchivedVideo[]) => [...prev, newVideo]);
+          setArchivedVideos((prev: ArchivedVideo[]) => [newVideo, ...prev]);
+          console.log('✅ Video added to UI');
+        } else {
+          throw new Error('Failed to add video');
         }
-    } else if (modalType === 'title') {
-      if (formData.title.trim() && !customTitles.includes(formData.title.trim())) {
+      } else if (modalType === 'title') {
+        if (formData.title.trim() && !customTitles.includes(formData.title.trim())) {
           const response = await fetch('/api/titles', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -179,17 +185,20 @@ export default function AdminDashboard() {
           if (response.ok) {
             const updatedTitles = await response.json();
             setCustomTitles(updatedTitles);
+          } else {
+            throw new Error('Failed to add title');
           }
         }
-    }
+      }
 
-    // Reset form and close modal
-    setFormData({ title: '', url: '', customTitle: '', thumbnail: '' });
-    setUploadedThumbnail(null);
-    setShowAddModal(false);
-    } catch (error) {
-      console.error('Error adding content:', error);
-      alert('Failed to add content. Please try again.');
+      // Reset form and close modal
+      setFormData({ title: '', url: '', customTitle: '', thumbnail: '' });
+      setUploadedThumbnail(null);
+      setShowAddModal(false);
+    } catch (error: any) {
+      console.error('❌ Error adding content:', error);
+      const errorMessage = error.message || 'Unknown error';
+      alert(`Failed to add content: ${errorMessage}\n\nCheck the browser console for more details.`);
     }
   };
 
@@ -203,34 +212,48 @@ export default function AdminDashboard() {
   // Function to delete content
   const handleDeleteContent = async (id: string, type: 'stream' | 'video' | 'title') => {
     try {
-    if (type === 'stream') {
+      console.log(`🗑️ Attempting to delete ${type}:`, id);
+      
+      if (type === 'stream') {
         const response = await fetch(`/api/streams?id=${id}`, {
           method: 'DELETE'
         });
         
         if (response.ok) {
           setLiveStreams((prev: LiveStream[]) => prev.filter(item => item.id !== id));
+          console.log('✅ Stream deleted from UI');
+        } else {
+          const error = await response.json();
+          throw new Error(error.details || error.error || 'Failed to delete stream');
         }
-    } else if (type === 'video') {
+      } else if (type === 'video') {
         const response = await fetch(`/api/videos?id=${id}`, {
           method: 'DELETE'
         });
         
         if (response.ok) {
           setArchivedVideos((prev: ArchivedVideo[]) => prev.filter(item => item.id !== id));
+          console.log('✅ Video deleted from UI');
+        } else {
+          const error = await response.json();
+          throw new Error(error.details || error.error || 'Failed to delete video');
         }
-    } else if (type === 'title') {
+      } else if (type === 'title') {
         const response = await fetch(`/api/titles?title=${encodeURIComponent(id)}`, {
           method: 'DELETE'
         });
         
         if (response.ok) {
           setCustomTitles((prev: string[]) => prev.filter(title => title !== id));
+          console.log('✅ Title deleted from UI');
+        } else {
+          const error = await response.json();
+          throw new Error(error.details || error.error || 'Failed to delete title');
         }
       }
-    } catch (error) {
-      console.error('Error deleting content:', error);
-      alert('Failed to delete content. Please try again.');
+    } catch (error: any) {
+      console.error('❌ Error deleting content:', error);
+      alert(`Failed to delete content: ${error.message}\n\nCheck console for details.`);
     }
   };
 

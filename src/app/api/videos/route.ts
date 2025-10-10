@@ -18,12 +18,14 @@ function ensureDataDir() {
 // GET - Fetch all videos
 export async function GET() {
   try {
+    console.log('📥 Fetching videos from file database...');
     ensureDataDir();
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const videos = JSON.parse(data);
+    console.log(`✅ Fetched ${videos.length} videos`);
     return NextResponse.json(videos);
-  } catch (error) {
-    console.error('Error reading videos:', error);
+  } catch (error: any) {
+    console.error('❌ Error reading videos:', error);
     return NextResponse.json([], { status: 500 });
   }
 }
@@ -33,15 +35,18 @@ export async function POST(request: NextRequest) {
   try {
     ensureDataDir();
     const newVideo = await request.json();
+    console.log('📝 Adding new video:', newVideo.title);
+    
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const videos = JSON.parse(data);
     
     videos.push(newVideo);
     fs.writeFileSync(DB_PATH, JSON.stringify(videos, null, 2));
+    console.log('✅ Video added successfully');
     
     return NextResponse.json(newVideo, { status: 201 });
-  } catch (error) {
-    console.error('Error adding video:', error);
+  } catch (error: any) {
+    console.error('❌ Error adding video:', error);
     return NextResponse.json({ error: 'Failed to add video' }, { status: 500 });
   }
 }
@@ -57,16 +62,17 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
     
+    console.log('🗑️ Deleting video:', id);
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const videos = JSON.parse(data);
     const filteredVideos = videos.filter((video: any) => video.id !== id);
     
     fs.writeFileSync(DB_PATH, JSON.stringify(filteredVideos, null, 2));
+    console.log('✅ Video deleted successfully');
     
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting video:', error);
+  } catch (error: any) {
+    console.error('❌ Error deleting video:', error);
     return NextResponse.json({ error: 'Failed to delete video' }, { status: 500 });
   }
 }
-

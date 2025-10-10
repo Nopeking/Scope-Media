@@ -19,13 +19,15 @@ function ensureDataDir() {
 // GET - Fetch all custom titles
 export async function GET() {
   try {
+    console.log('📥 Fetching custom titles from file database...');
     ensureDataDir();
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const titles = JSON.parse(data);
+    console.log(`✅ Fetched ${titles.length} custom titles`);
     return NextResponse.json(titles);
-  } catch (error) {
-    console.error('Error reading titles:', error);
-    return NextResponse.json([], { status: 500 });
+  } catch (error: any) {
+    console.error('❌ Error reading titles:', error);
+    return NextResponse.json(['Tech Conferences', 'Cooking Shows', 'Music Events'], { status: 500 });
   }
 }
 
@@ -34,17 +36,22 @@ export async function POST(request: NextRequest) {
   try {
     ensureDataDir();
     const { title } = await request.json();
+    console.log('📝 Adding new custom title:', title);
+    
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const titles = JSON.parse(data);
     
     if (!titles.includes(title)) {
       titles.push(title);
       fs.writeFileSync(DB_PATH, JSON.stringify(titles, null, 2));
+      console.log('✅ Custom title added successfully');
+    } else {
+      console.log('⚠️ Title already exists');
     }
     
     return NextResponse.json(titles, { status: 201 });
-  } catch (error) {
-    console.error('Error adding title:', error);
+  } catch (error: any) {
+    console.error('❌ Error adding title:', error);
     return NextResponse.json({ error: 'Failed to add title' }, { status: 500 });
   }
 }
@@ -60,16 +67,17 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
     
+    console.log('🗑️ Deleting custom title:', title);
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     const titles = JSON.parse(data);
     const filteredTitles = titles.filter((t: string) => t !== title);
     
     fs.writeFileSync(DB_PATH, JSON.stringify(filteredTitles, null, 2));
+    console.log('✅ Custom title deleted successfully');
     
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting title:', error);
+  } catch (error: any) {
+    console.error('❌ Error deleting title:', error);
     return NextResponse.json({ error: 'Failed to delete title' }, { status: 500 });
   }
 }
-

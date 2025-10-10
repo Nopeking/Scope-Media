@@ -12,22 +12,27 @@ export default function Home() {
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
 
-  // Load data from localStorage on component mount
+  // Fetch data from API on component mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedStreams = localStorage.getItem('liveStreams');
-      const storedVideos = localStorage.getItem('archivedVideos');
-      
-      if (storedStreams) {
-        setLiveStreams(JSON.parse(storedStreams));
-      }
-      
-      if (storedVideos) {
+    const fetchData = async () => {
+      try {
+        const [streamsRes, videosRes] = await Promise.all([
+          fetch('/api/streams'),
+          fetch('/api/videos')
+        ]);
+        
+        const streams = await streamsRes.json();
+        const videos = await videosRes.json();
+        
+        setLiveStreams(streams);
         // Get the 4 most recent videos
-        const videos = JSON.parse(storedVideos).slice(0, 4);
-        setRecentVideos(videos);
+        setRecentVideos(videos.slice(0, 4));
+      } catch (error) {
+        console.error('Error fetching data:', error);
       }
-    }
+    };
+    
+    fetchData();
   }, []);
 
   // Handle video selection

@@ -12,23 +12,27 @@ export default function PastShowsPage() {
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
 
-  // Load data from localStorage on component mount
+  // Fetch data from API on component mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedVideos = localStorage.getItem('archivedVideos');
-      if (storedVideos) {
-        const videos = JSON.parse(storedVideos);
+    const fetchData = async () => {
+      try {
+        const response = await fetch('/api/videos');
+        const videos = await response.json();
         setPastShows(videos);
         
         // Extract unique months
-        const months = [...new Set(videos.map(video => video.month))].sort((a, b) => {
+        const months = [...new Set(videos.map((video: any) => video.month))].sort((a, b) => {
           const dateA = new Date(a);
           const dateB = new Date(b);
           return dateB.getTime() - dateA.getTime();
         });
         setUniqueMonths(months);
+      } catch (error) {
+        console.error('Error fetching archived videos:', error);
       }
-    }
+    };
+    
+    fetchData();
   }, []);
 
   // Handle video selection

@@ -10,14 +10,19 @@ export default function LivePage() {
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
 
-  // Load data from localStorage on component mount
+  // Fetch data from API on component mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedStreams = localStorage.getItem('liveStreams');
-      if (storedStreams) {
-        setLiveStreams(JSON.parse(storedStreams));
+    const fetchData = async () => {
+      try {
+        const response = await fetch('/api/streams');
+        const streams = await response.json();
+        setLiveStreams(streams);
+      } catch (error) {
+        console.error('Error fetching live streams:', error);
       }
-    }
+    };
+    
+    fetchData();
   }, []);
 
   // Handle video selection
