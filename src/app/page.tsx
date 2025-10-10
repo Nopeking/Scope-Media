@@ -11,6 +11,7 @@ export default function Home() {
   const [recentVideos, setRecentVideos] = useState<any[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Fetch data from API on component mount
   useEffect(() => {
@@ -29,6 +30,8 @@ export default function Home() {
         setRecentVideos(videos.slice(0, 4));
       } catch (error) {
         console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -41,10 +44,21 @@ export default function Home() {
     setShowVideoModal(true);
   };
 
+  if (isLoading) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading content...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full">
+    <div className="w-full" suppressHydrationWarning>
       {/* Hero Section */}
-      <section className="relative min-h-[500px] w-full overflow-hidden">
+      <section className="relative min-h-[500px] w-full overflow-hidden" suppressHydrationWarning>
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{

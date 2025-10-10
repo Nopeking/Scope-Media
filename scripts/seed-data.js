@@ -13,7 +13,7 @@ const defaultVideo = {
   id: "1728000000000",
   title: "Class 6B Novice",
   url: "https://youtube.com/live/uR2vU5AxZMk",
-  thumbnail: "https://i.ytimg.com/vi/uR2vU5AxZMk/maxresdefault.jpg",
+  thumbnail: "/equestrian-thumbnail.jpg",
   duration: "Live",
   uploadDate: "10/10/2025",
   customTitle: "Emirates Longines League - (Arena 2) Butheeb Equestrian Academy",
