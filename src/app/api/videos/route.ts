@@ -1,66 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'videos.json');
-
-// Default video data (fallback for Netlify/serverless)
-const DEFAULT_VIDEOS = [
-  {
-    id: "1728000000000",
-    title: "Class 6B Novice",
-    url: "https://youtube.com/live/uR2vU5AxZMk",
-    thumbnail: "/equestrian-thumbnail.jpg",
-    duration: "Live",
-    uploadDate: "10/10/2025",
-    customTitle: "Emirates Longines League - (Arena 2) Butheeb Equestrian Academy",
-    month: "October 2025"
-  }
-];
-
-// In-memory storage for serverless environments
-let memoryVideos: any[] = [...DEFAULT_VIDEOS];
-
-// Ensure data directory exists (only works on writable filesystems)
-function ensureDataDir() {
-  try {
-    const dataDir = path.join(process.cwd(), 'data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    if (!fs.existsSync(DB_PATH)) {
-      fs.writeFileSync(DB_PATH, JSON.stringify(DEFAULT_VIDEOS, null, 2));
-    }
-    return true;
-  } catch (error) {
-    console.log('⚠️  Running in serverless environment (read-only filesystem)');
-    return false;
-  }
-}
+import { supabaseAdmin } from '@/lib/supabase';
+import { ArchivedVideoInsert, ArchivedVideoUpdate } from '@/types';
 
 // GET - Fetch all videos
 export async function GET() {
   try {
     console.log('📥 Fetching videos...');
     
-    // Try to read from file first (local development)
-    if (ensureDataDir()) {
-      try {
-        const data = fs.readFileSync(DB_PATH, 'utf-8');
-        const videos = JSON.parse(data);
-        console.log(`✅ Fetched ${videos.length} videos from file`);
-        return NextResponse.json(videos);
-      } catch (fileError) {
-        console.log('⚠️  Could not read file, using memory storage');
-      }
+    const { data: videos, error } = await supabaseAdmin
+      .from('archived_videos')
+      .select('*')
+      .order('upload_date', { ascending: false });
+
+    if (error) {
+      console.error('❌ Error fetching videos:', error);
+      return NextResponse.json({ error: 'Failed to fetch videos' }, { status: 500 });
     }
-    
-    // Fallback to memory storage (Netlify/serverless)
-    console.log(`✅ Fetched ${memoryVideos.length} videos from memory`);
-    return NextResponse.json(memoryVideos);
+
+    // Map database snake_case to frontend camelCase
+    const mappedVideos = videos?.map(video => {
+      // Create month string from upload_date
+      const uploadDate = new Date(video.upload_date);
+      const month = uploadDate.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long' 
+      });
+      
+      return {
+        id: video.id,
+        title: video.title,
+        url: video.url,
+        duration: video.duration,
+        uploadDate: video.upload_date,
+        customTitle: video.custom_title, // Map custom_title to customTitle
+        thumbnail: video.thumbnail,
+        month: month // Add month property
+      };
+    }) || [];
+
+    console.log(`✅ Fetched ${mappedVideos.length} videos from Supabase`);
+    return NextResponse.json(mappedVideos);
   } catch (error: any) {
     console.error('❌ Error reading videos:', error);
-    return NextResponse.json(DEFAULT_VIDEOS, { status: 200 });
+    return NextResponse.json({ error: 'Failed to fetch videos' }, { status: 500 });
   }
 }
 
@@ -70,24 +52,28 @@ export async function POST(request: NextRequest) {
     const newVideo = await request.json();
     console.log('📝 Adding new video:', newVideo.title);
     
-    // Try file system first (local development)
-    if (ensureDataDir()) {
-      try {
-        const data = fs.readFileSync(DB_PATH, 'utf-8');
-        const videos = JSON.parse(data);
-        videos.push(newVideo);
-        fs.writeFileSync(DB_PATH, JSON.stringify(videos, null, 2));
-        console.log('✅ Video added to file successfully');
-        return NextResponse.json(newVideo, { status: 201 });
-      } catch (fileError) {
-        console.log('⚠️  Could not write to file, using memory storage');
-      }
-    }
+    // Map frontend camelCase to database snake_case
+    const videoData: ArchivedVideoInsert = {
+      title: newVideo.title,
+      url: newVideo.url,
+      duration: newVideo.duration || null,
+      custom_title: newVideo.customTitle, // Map customTitle to custom_title
+      thumbnail: newVideo.thumbnail || null
+    };
     
-    // Fallback to memory storage (Netlify/serverless)
-    memoryVideos.push(newVideo);
-    console.log('✅ Video added to memory (temporary - will not persist)');
-    return NextResponse.json(newVideo, { status: 201 });
+    const { data: video, error } = await supabaseAdmin
+      .from('archived_videos')
+      .insert(videoData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error adding video:', error);
+      return NextResponse.json({ error: 'Failed to add video' }, { status: 500 });
+    }
+
+    console.log('✅ Video added to Supabase successfully');
+    return NextResponse.json(video, { status: 201 });
   } catch (error: any) {
     console.error('❌ Error adding video:', error);
     return NextResponse.json({ error: 'Failed to add video' }, { status: 500 });
@@ -106,23 +92,17 @@ export async function DELETE(request: NextRequest) {
     
     console.log('🗑️ Deleting video:', id);
     
-    // Try file system first (local development)
-    if (ensureDataDir()) {
-      try {
-        const data = fs.readFileSync(DB_PATH, 'utf-8');
-        const videos = JSON.parse(data);
-        const filteredVideos = videos.filter((video: any) => video.id !== id);
-        fs.writeFileSync(DB_PATH, JSON.stringify(filteredVideos, null, 2));
-        console.log('✅ Video deleted from file successfully');
-        return NextResponse.json({ success: true });
-      } catch (fileError) {
-        console.log('⚠️  Could not write to file, using memory storage');
-      }
+    const { error } = await supabaseAdmin
+      .from('archived_videos')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('❌ Error deleting video:', error);
+      return NextResponse.json({ error: 'Failed to delete video' }, { status: 500 });
     }
-    
-    // Fallback to memory storage (Netlify/serverless)
-    memoryVideos = memoryVideos.filter((video: any) => video.id !== id);
-    console.log('✅ Video deleted from memory (temporary)');
+
+    console.log('✅ Video deleted from Supabase successfully');
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('❌ Error deleting video:', error);

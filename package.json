@@ -7,9 +7,12 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "seed": "node scripts/seed-data.js"
+    "seed": "node scripts/seed-data.js",
+    "migrate": "node scripts/migrate-to-supabase.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.75.0",
+    "dotenv": "^17.2.3",
     "framer-motion": "^12.23.22",
     "lucide-react": "^0.545.0",
     "next": "15.5.4",

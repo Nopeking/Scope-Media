@@ -269,7 +269,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50" suppressHydrationWarning>
+    <div className="min-h-screen bg-slate-50 admin-panel" suppressHydrationWarning>
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-slate-200" suppressHydrationWarning>
         <div className="container mx-auto px-4 py-3 sm:py-4 sm:px-6 lg:px-8" suppressHydrationWarning>
@@ -669,7 +669,7 @@ export default function AdminDashboard() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow-2xl w-full max-w-md"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-md modal"
           >
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">

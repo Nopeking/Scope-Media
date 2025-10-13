@@ -14,3 +14,86 @@
 * {
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
+
+/* Hide browser extension attributes that cause hydration issues */
+[bis_skin_checked] {
+  /* This won't prevent the attribute from being added, but it helps with styling */
+  opacity: 1;
+}
+
+/* Fix text selection and input text color issues */
+::selection {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+::-moz-selection {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+/* Fix input text color globally */
+input, textarea, select {
+  color: #1f2937 !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Fix text selection in specific admin areas */
+.admin-panel ::selection {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+.admin-panel input, .admin-panel textarea, .admin-panel select {
+  color: #1f2937 !important;
+}
+
+/* Fix specific input styling in admin panel */
+.admin-panel input[type="text"],
+.admin-panel input[type="email"],
+.admin-panel input[type="password"],
+.admin-panel input[type="url"],
+.admin-panel textarea {
+  color: #1f2937 !important;
+  background-color: white !important;
+}
+
+.admin-panel input[type="text"]::placeholder,
+.admin-panel input[type="email"]::placeholder,
+.admin-panel input[type="password"]::placeholder,
+.admin-panel input[type="url"]::placeholder,
+.admin-panel textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Fix modal input styling */
+.admin-panel .modal input,
+.admin-panel .modal textarea {
+  color: #1f2937 !important;
+}
+
+/* Ensure proper contrast for selected sidebar items */
+.sidebar-item.selected {
+  background-color: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+
+.sidebar-item.selected:hover {
+  background-color: #e5e7eb !important;
+  color: #1f2937 !important;
+}
+
+/* Fix any white text on light backgrounds */
+.admin-panel .text-white {
+  color: #1f2937 !important;
+}
+
+/* Ensure form elements have proper contrast */
+.admin-panel form input,
+.admin-panel form textarea,
+.admin-panel form select {
+  color: #1f2937 !important;
+}

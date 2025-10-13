@@ -20,8 +20,8 @@ export default function PastShowsPage() {
         const videos = await response.json();
         setPastShows(videos);
         
-        // Extract unique months
-        const months = [...new Set(videos.map((video: any) => video.month))].sort((a, b) => {
+        // Extract unique months - handle cases where month might be undefined
+        const months = [...new Set(videos.map((video: any) => video.month).filter(Boolean))].sort((a, b) => {
           const dateA = new Date(a);
           const dateB = new Date(b);
           return dateB.getTime() - dateA.getTime();
@@ -109,9 +109,9 @@ export default function PastShowsPage() {
             >
               All
             </button>
-            {uniqueMonths.map((month) => (
+            {uniqueMonths.map((month, index) => (
               <button
-                key={month}
+                key={month || `month-${index}`}
                 onClick={() => setSelectedMonth(month)}
                 className={`px-6 py-3 rounded-full font-medium transition-colors ${
                   selectedMonth === month
@@ -129,7 +129,7 @@ export default function PastShowsPage() {
         <div className="space-y-12">
           {Object.entries(groupedShows).map(([customTitle, shows], groupIndex) => (
             <motion.section
-              key={customTitle}
+              key={customTitle || `group-${groupIndex}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: groupIndex * 0.1 }}
@@ -139,7 +139,7 @@ export default function PastShowsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {shows.map((show, index) => (
                   <motion.div
-                    key={show.id}
+                    key={show.id || `show-${groupIndex}-${index}`}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: (groupIndex * 0.1) + (index * 0.05) }}
