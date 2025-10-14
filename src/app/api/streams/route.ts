@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { StreamInsert, StreamUpdate } from '@/types';
 
 // GET - Fetch all streams
@@ -7,7 +7,7 @@ export async function GET() {
   try {
     console.log('📥 Fetching streams...');
     
-    const { data: streams, error } = await supabaseAdmin
+        const { data: streams, error } = await getSupabaseAdmin()
       .from('streams')
       .select('*')
       .order('created_at', { ascending: false });
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     const newStream: StreamInsert = await request.json();
     console.log('📝 Adding new stream:', newStream.title);
     
-    const { data: stream, error } = await supabaseAdmin
+        const { data: stream, error } = await getSupabaseAdmin()
       .from('streams')
       .insert(newStream)
       .select()
@@ -62,7 +62,7 @@ export async function DELETE(request: NextRequest) {
     
     console.log('🗑️ Deleting stream:', id);
     
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('streams')
       .delete()
       .eq('id', id);

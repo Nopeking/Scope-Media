@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, Play, Pause, Upload, Users, Eye, Settings } from 'lucide-react';
 import { LiveStream, ArchivedVideo } from '@/types';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 // Initial data arrays - will be populated when content is added
 const initialLiveStreams: LiveStream[] = [];
@@ -11,14 +12,19 @@ const initialArchivedVideos: ArchivedVideo[] = [];
 const initialCustomTitles: string[] = ['Tech Conferences', 'Cooking Shows', 'Music Events'];
 
 export default function AdminDashboard() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalType, setModalType] = useState('content'); // 'content', 'stream', 'video', 'title'
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
   
   // State for managing content
   const [liveStreams, setLiveStreams] = useState<LiveStream[]>(initialLiveStreams);
   const [archivedVideos, setArchivedVideos] = useState<ArchivedVideo[]>(initialArchivedVideos);
   const [customTitles, setCustomTitles] = useState<string[]>(initialCustomTitles);
+  const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Form state
@@ -32,24 +38,36 @@ export default function AdminDashboard() {
   // File upload state
   const [uploadedThumbnail, setUploadedThumbnail] = useState<string | null>(null);
 
+  // Initialize tab from URL parameter
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['overview', 'live-streams', 'archived-videos', 'custom-titles', 'users'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
   // Fetch data from API on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [streamsRes, videosRes, titlesRes] = await Promise.all([
+        const [streamsRes, videosRes, titlesRes, usersRes] = await Promise.all([
           fetch('/api/streams'),
           fetch('/api/videos'),
-          fetch('/api/titles')
+          fetch('/api/titles'),
+          fetch('/api/users')
         ]);
         
         const streams = await streamsRes.json();
         const videos = await videosRes.json();
         const titles = await titlesRes.json();
+        const usersData = await usersRes.json();
         
         setLiveStreams(streams);
         setArchivedVideos(videos);
         setCustomTitles(titles);
+        setUsers(usersData);
+        console.log('Users data received:', usersData);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -67,6 +85,47 @@ export default function AdminDashboard() {
     { id: 'custom-titles', label: 'Custom Titles', icon: Settings },
     { id: 'users', label: 'Users', icon: Users },
   ];
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    // Update URL without page refresh
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tabId);
+    router.replace(url.pathname + url.search);
+  };
+
+  const handleEditUser = (user: any) => {
+    setEditingUser(user);
+    setShowEditUserModal(true);
+  };
+
+  const handleUpdateUser = async (updatedUser: any) => {
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: updatedUser.id,
+          ...updatedUser
+        }),
+      });
+
+      if (response.ok) {
+        // Update the users list
+        setUsers(users.map(user => 
+          user.id === updatedUser.id ? { ...user, ...updatedUser } : user
+        ));
+        setShowEditUserModal(false);
+        setEditingUser(null);
+      } else {
+        console.error('Failed to update user');
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+    }
+  };
 
   // Function to handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -301,7 +360,7 @@ export default function AdminDashboard() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => handleTabChange(tab.id)}
                     className={`flex items-center gap-2 lg:gap-3 px-3 py-2 lg:px-4 lg:py-3 rounded-lg text-left transition-colors whitespace-nowrap flex-shrink-0 lg:w-full text-sm lg:text-base ${
                       activeTab === tab.id
                         ? 'bg-primary text-white'
@@ -648,14 +707,98 @@ export default function AdminDashboard() {
               >
                 <div className="flex items-center justify-between">
                   <h2 className="text-3xl font-bold text-slate-800">User Management</h2>
-                  <button className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
+                  <button 
+                    onClick={() => {
+                      setModalType('user');
+                      setShowAddModal(true);
+                    }}
+                    className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                  >
                     <Plus className="h-5 w-5" />
                     Add User
                   </button>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <p className="text-slate-600">User management features will be available in future updates.</p>
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="p-6">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold text-slate-800 mb-2">All Users</h3>
+                      <p className="text-slate-600">Manage user accounts and their libraries</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {users.length > 0 ? (
+                        users.map((user) => {
+                          const initials = user.full_name 
+                            ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+                            : user.email.substring(0, 2).toUpperCase();
+                          
+                          const planColors = {
+                            free: 'text-blue-600',
+                            premium: 'text-green-600',
+                            enterprise: 'text-purple-600'
+                          };
+
+                          const joinDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A';
+
+                          return (
+                            <div key={user.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                                  <span className="text-white font-semibold text-sm">{initials}</span>
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-slate-800">{user.full_name || 'User'}</h4>
+                                  <p className="text-sm text-slate-500">{user.email}</p>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-600">Plan:</span>
+                                  <span className={`font-medium ${planColors[user.subscription_plan as keyof typeof planColors] || 'text-slate-600'}`}>
+                                    {user.subscription_plan?.charAt(0).toUpperCase() + user.subscription_plan?.slice(1)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-600">User ID:</span>
+                                  <span className="font-medium text-xs text-slate-800 bg-slate-100 px-2 py-1 rounded">
+                                    {user.id ? user.id.substring(0, 8) + '...' : 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-600">Joined:</span>
+                                  <span className="font-medium text-slate-800">
+                                    {user.created_at ? joinDate : 'N/A'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 mt-3">
+                                <button 
+                                  onClick={() => {
+                                    // Navigate to user's library
+                                    window.open(`/my-library?userId=${user.id}`, '_blank');
+                                  }}
+                                  className="flex-1 bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors"
+                                >
+                                  View Library
+                                </button>
+                                <button 
+                                  onClick={() => handleEditUser(user)}
+                                  className="flex-1 bg-slate-100 text-slate-600 px-3 py-1 rounded text-sm hover:bg-slate-200 transition-colors"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="col-span-full text-center py-8">
+                          <p className="text-slate-500">No users found. Users will appear here once they sign up.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -906,6 +1049,105 @@ export default function AdminDashboard() {
                   {modalType === 'content' ? 'Continue' : 'Add'}
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditUserModal && editingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" suppressHydrationWarning>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl shadow-2xl w-full max-w-md"
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-slate-800">Edit User</h3>
+                <button
+                  onClick={() => {
+                    setShowEditUserModal(false);
+                    setEditingUser(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target as HTMLFormElement);
+                const updatedUser = {
+                  id: editingUser.id,
+                  email: formData.get('email') as string,
+                  full_name: formData.get('full_name') as string,
+                  subscription_plan: formData.get('subscription_plan') as string,
+                };
+                handleUpdateUser(updatedUser);
+              }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    defaultValue={editingUser.email}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    name="full_name"
+                    defaultValue={editingUser.full_name || ''}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Subscription Plan
+                  </label>
+                  <select
+                    name="subscription_plan"
+                    defaultValue={editingUser.subscription_plan}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="free">Free</option>
+                    <option value="premium">Premium</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditUserModal(false);
+                      setEditingUser(null);
+                    }}
+                    className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    Update User
+                  </button>
+                </div>
+              </form>
             </div>
           </motion.div>
         </div>

@@ -5,15 +5,15 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+// Check required environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
   const missingVars = [];
   if (!supabaseUrl) missingVars.push('NEXT_PUBLIC_SUPABASE_URL');
   if (!supabaseAnonKey) missingVars.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  if (!supabaseServiceRoleKey) missingVars.push('SUPABASE_SERVICE_ROLE_KEY');
   
   throw new Error(
-    `Supabase environment variables are not set. Missing: ${missingVars.join(', ')}. ` +
-    'Please check your .env.local file or Netlify environment variables.'
+    `Required Supabase environment variables are not set. Missing: ${missingVars.join(', ')}. ` +
+    'Please check your .env.local file.'
   );
 }
 
@@ -21,8 +21,19 @@ if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
 // Client for admin access (e.g., server-side operations with service role key)
-export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
-  auth: {
-    persistSession: false,
-  },
-});
+// Only create admin client if service role key is available (server-side only)
+export const supabaseAdmin = supabaseServiceRoleKey 
+  ? createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        persistSession: false,
+      },
+    })
+  : null;
+
+// Helper function to get admin client (throws error if not available)
+export function getSupabaseAdmin() {
+  if (!supabaseServiceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not available. This function can only be used server-side.');
+  }
+  return supabaseAdmin!;
+}

@@ -16,9 +16,18 @@
 }
 
 /* Hide browser extension attributes that cause hydration issues */
-[bis_skin_checked] {
+[bis_skin_checked],
+[data-bis_skin_checked],
+[bis_skin_checked_style],
+[data-bis_skin_checked_style] {
   /* This won't prevent the attribute from being added, but it helps with styling */
-  opacity: 1;
+  opacity: 1 !important;
+}
+
+/* Force removal of extension attributes using CSS */
+[bis_skin_checked]::before,
+[data-bis_skin_checked]::before {
+  content: none !important;
 }
 
 /* Fix text selection and input text color issues */
@@ -35,10 +44,98 @@
 /* Fix input text color globally */
 input, textarea, select {
   color: #1f2937 !important;
+  background-color: white !important;
+  border: 1px solid #d1d5db !important;
 }
 
 input::placeholder, textarea::placeholder {
   color: #6b7280 !important;
+}
+
+/* Fix modal z-index and positioning */
+.modal {
+  z-index: 9999 !important;
+  position: fixed !important;
+}
+
+/* Ensure modal overlay is above everything */
+.fixed.inset-0 {
+  z-index: 9998 !important;
+}
+
+/* Fix modal content positioning */
+.modal .bg-white {
+  z-index: 10000 !important;
+  position: relative !important;
+}
+
+/* Navigation backdrop blur styles - More specific targeting */
+header[class*="sticky"] {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  background-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.dark header[class*="sticky"] {
+  background: rgba(15, 23, 42, 0.7) !important;
+  background-color: rgba(15, 23, 42, 0.7) !important;
+}
+
+/* Force backdrop blur on all headers */
+header {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+/* Target navigation header specifically */
+header[data-nav="true"] {
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+  background: rgba(30, 41, 59, 0.95) !important;
+  background-color: rgba(30, 41, 59, 0.95) !important;
+  z-index: 50 !important;
+}
+
+.dark header[data-nav="true"] {
+  background: rgba(30, 41, 59, 0.95) !important;
+  background-color: rgba(30, 41, 59, 0.95) !important;
+}
+
+/* Ensure modal backdrop blocks interaction with background content */
+.modal-backdrop {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9998 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Fix any overlapping content issues */
+.modal-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem !important;
+}
+
+/* Ensure modal content is clickable and interactive */
+.modal-content {
+  position: relative !important;
+  z-index: 10000 !important;
+  background-color: white !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  max-width: 28rem !important;
+  width: 100% !important;
 }
 
 /* Fix text selection in specific admin areas */

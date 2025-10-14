@@ -8,7 +8,16 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "node scripts/seed-data.js",
-    "migrate": "node scripts/migrate-to-supabase.js"
+    "migrate": "node scripts/migrate-to-supabase.js",
+    "migration:create": "node scripts/create-migration.js",
+    "migration:run": "node scripts/run-migration.js",
+    "test:db": "node scripts/test-database.js",
+    "test:profile": "node scripts/test-user-profile.js",
+    "setup:demo": "node scripts/setup-demo-users.js",
+    "test:login": "node scripts/test-login.js",
+    "check:users": "node scripts/check-current-users.js",
+    "test:library": "node scripts/test-user-library.js",
+    "test:users-api": "node scripts/test-users-api.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.75.0",

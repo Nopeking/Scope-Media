@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { CustomTitleInsert, CustomTitleUpdate } from '@/types';
 
 // GET - Fetch all custom titles
@@ -7,7 +7,7 @@ export async function GET() {
   try {
     console.log('📥 Fetching custom titles...');
     
-    const { data: titles, error } = await supabaseAdmin
+        const { data: titles, error } = await getSupabaseAdmin()
       .from('custom_titles')
       .select('*')
       .order('created_at', { ascending: false });
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const { title } = await request.json();
     console.log('📝 Adding new custom title:', title);
     
-    const { data: newTitle, error } = await supabaseAdmin
+    const { data: newTitle, error } = await getSupabaseAdmin()
       .from('custom_titles')
       .insert({ title })
       .select()
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ Custom title added to Supabase successfully');
     
     // Return all titles for backward compatibility
-    const { data: allTitles } = await supabaseAdmin
+    const { data: allTitles } = await getSupabaseAdmin()
       .from('custom_titles')
       .select('title')
       .order('created_at', { ascending: false });
@@ -72,7 +72,7 @@ export async function DELETE(request: NextRequest) {
     
     console.log('🗑️ Deleting custom title:', title);
     
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('custom_titles')
       .delete()
       .eq('title', title);

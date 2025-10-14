@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { ArchivedVideoInsert, ArchivedVideoUpdate } from '@/types';
 
 // GET - Fetch all videos
@@ -7,7 +7,7 @@ export async function GET() {
   try {
     console.log('📥 Fetching videos...');
     
-    const { data: videos, error } = await supabaseAdmin
+        const { data: videos, error } = await getSupabaseAdmin()
       .from('archived_videos')
       .select('*')
       .order('upload_date', { ascending: false });
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       thumbnail: newVideo.thumbnail || null
     };
     
-    const { data: video, error } = await supabaseAdmin
+        const { data: video, error } = await getSupabaseAdmin()
       .from('archived_videos')
       .insert(videoData)
       .select()
@@ -92,7 +92,7 @@ export async function DELETE(request: NextRequest) {
     
     console.log('🗑️ Deleting video:', id);
     
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('archived_videos')
       .delete()
       .eq('id', id);

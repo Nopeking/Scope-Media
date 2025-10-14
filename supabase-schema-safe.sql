@@ -1,3 +1,6 @@
+-- Safe Supabase Schema - Can be run multiple times without conflicts
+-- This version handles existing tables, indexes, and policies gracefully
+
 -- Create the streams table
 CREATE TABLE IF NOT EXISTS streams (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -30,36 +33,6 @@ CREATE TABLE IF NOT EXISTS custom_titles (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_streams_status ON streams(status);
-CREATE INDEX IF NOT EXISTS idx_streams_created_at ON streams(created_at);
-CREATE INDEX IF NOT EXISTS idx_archived_videos_upload_date ON archived_videos(upload_date);
-CREATE INDEX IF NOT EXISTS idx_archived_videos_custom_title ON archived_videos(custom_title);
-
--- Enable Row Level Security (RLS)
-ALTER TABLE streams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE archived_videos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE custom_titles ENABLE ROW LEVEL SECURITY;
-
--- Drop existing policies if they exist (to avoid conflicts)
-DROP POLICY IF EXISTS "Allow public read access to streams" ON streams;
-DROP POLICY IF EXISTS "Allow public read access to archived_videos" ON archived_videos;
-DROP POLICY IF EXISTS "Allow public read access to custom_titles" ON custom_titles;
-DROP POLICY IF EXISTS "Allow all operations on streams" ON streams;
-DROP POLICY IF EXISTS "Allow all operations on archived_videos" ON archived_videos;
-DROP POLICY IF EXISTS "Allow all operations on custom_titles" ON custom_titles;
-
--- Create policies for public read access (you can modify these based on your auth requirements)
-CREATE POLICY "Allow public read access to streams" ON streams FOR SELECT USING (true);
-CREATE POLICY "Allow public read access to archived_videos" ON archived_videos FOR SELECT USING (true);
-CREATE POLICY "Allow public read access to custom_titles" ON custom_titles FOR SELECT USING (true);
-
--- Create policies for admin write access (you'll need to implement proper admin authentication)
--- For now, we'll allow all operations - you should restrict this based on your auth system
-CREATE POLICY "Allow all operations on streams" ON streams FOR ALL USING (true);
-CREATE POLICY "Allow all operations on archived_videos" ON archived_videos FOR ALL USING (true);
-CREATE POLICY "Allow all operations on custom_titles" ON custom_titles FOR ALL USING (true);
 
 -- Create user_profiles table (extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS user_profiles (
@@ -102,19 +75,33 @@ CREATE TABLE IF NOT EXISTS user_library_sharing (
   UNIQUE(library_item_id, shared_with_user_id)
 );
 
--- Create indexes for better performance
+-- Create indexes for better performance (only if they don't exist)
+CREATE INDEX IF NOT EXISTS idx_streams_status ON streams(status);
+CREATE INDEX IF NOT EXISTS idx_streams_created_at ON streams(created_at);
+CREATE INDEX IF NOT EXISTS idx_archived_videos_upload_date ON archived_videos(upload_date);
+CREATE INDEX IF NOT EXISTS idx_archived_videos_custom_title ON archived_videos(custom_title);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_email ON user_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_user_library_user_id ON user_library(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_library_content_type ON user_library(content_type);
 CREATE INDEX IF NOT EXISTS idx_user_library_created_at ON user_library(created_at);
 CREATE INDEX IF NOT EXISTS idx_user_library_sharing_shared_with ON user_library_sharing(shared_with_user_id);
 
--- Enable Row Level Security (RLS)
+-- Enable Row Level Security (RLS) - these are safe to run multiple times
+ALTER TABLE streams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE archived_videos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE custom_titles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_library ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_library_sharing ENABLE ROW LEVEL SECURITY;
 
--- Drop existing user policies if they exist
+-- Drop existing policies if they exist (to avoid conflicts)
+DROP POLICY IF EXISTS "Allow public read access to streams" ON streams;
+DROP POLICY IF EXISTS "Allow public read access to archived_videos" ON archived_videos;
+DROP POLICY IF EXISTS "Allow public read access to custom_titles" ON custom_titles;
+DROP POLICY IF EXISTS "Allow all operations on streams" ON streams;
+DROP POLICY IF EXISTS "Allow all operations on archived_videos" ON archived_videos;
+DROP POLICY IF EXISTS "Allow all operations on custom_titles" ON custom_titles;
+
 DROP POLICY IF EXISTS "Users can view their own profile" ON user_profiles;
 DROP POLICY IF EXISTS "Users can update their own profile" ON user_profiles;
 DROP POLICY IF EXISTS "Users can insert their own profile" ON user_profiles;
@@ -128,6 +115,16 @@ DROP POLICY IF EXISTS "Admins can manage all libraries" ON user_library;
 DROP POLICY IF EXISTS "Users can view shared content" ON user_library_sharing;
 DROP POLICY IF EXISTS "Users can share their content" ON user_library_sharing;
 
+-- Create policies for public read access
+CREATE POLICY "Allow public read access to streams" ON streams FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to archived_videos" ON archived_videos FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to custom_titles" ON custom_titles FOR SELECT USING (true);
+
+-- Create policies for admin write access (you should restrict this based on your auth system)
+CREATE POLICY "Allow all operations on streams" ON streams FOR ALL USING (true);
+CREATE POLICY "Allow all operations on archived_videos" ON archived_videos FOR ALL USING (true);
+CREATE POLICY "Allow all operations on custom_titles" ON custom_titles FOR ALL USING (true);
+
 -- User profiles policies
 CREATE POLICY "Users can view their own profile" ON user_profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update their own profile" ON user_profiles FOR UPDATE USING (auth.uid() = id);
@@ -139,7 +136,7 @@ CREATE POLICY "Users can insert into their own library" ON user_library FOR INSE
 CREATE POLICY "Users can update their own library" ON user_library FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete their own library" ON user_library FOR DELETE USING (auth.uid() = user_id);
 
--- Allow admins to manage any user's library (you'll need to implement admin role checking)
+-- Allow admins to manage any user's library
 CREATE POLICY "Admins can manage all libraries" ON user_library FOR ALL USING (
   EXISTS (
     SELECT 1 FROM user_profiles 
@@ -167,9 +164,15 @@ CREATE POLICY "Users can share their content" ON user_library_sharing FOR INSERT
   )
 );
 
--- Insert some sample data
+-- Insert some sample data (safe to run multiple times)
 INSERT INTO custom_titles (title) VALUES
   ('Tech Conferences'),
   ('Cooking Shows'),
   ('Music Events')
 ON CONFLICT (title) DO NOTHING;
+
+-- Success message
+DO $$
+BEGIN
+    RAISE NOTICE 'Schema updated successfully! All tables, indexes, and policies have been created/updated.';
+END $$;
