@@ -32,6 +32,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Database
+/data
+*.db
+*.sqlite
+
 # IDE
 .vscode/
 .idea/

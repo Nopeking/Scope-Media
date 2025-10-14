@@ -172,9 +172,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, thumbnail, autoplay = fa
                 whileTap={{ scale: 0.9 }}
               >
                 <Play className="h-16 w-16 text-white ml-1" />
-              </motion.div>
-            </div>
-          )}
+          </motion.div>
+        </div>
+      )}
 
           {/* Error overlay */}
           {error && (
@@ -192,8 +192,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, thumbnail, autoplay = fa
                   <ExternalLink className="h-4 w-4" />
                   Open in New Tab
                 </a>
-              </div>
-            </div>
+                  </div>
+                </div>
           )}
         </>
       )}
