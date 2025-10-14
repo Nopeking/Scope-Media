@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Upload, Video, Image, FileText, Trash2, Edit, Share2, Eye, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,7 +9,7 @@ import AuthModal from '@/components/AuthModal';
 import { useHydrationFix } from '@/hooks/useHydrationFix';
 import { useSearchParams } from 'next/navigation';
 
-export default function MyLibraryPage() {
+function MyLibraryContent() {
   const { user, userProfile, loading: authLoading } = useAuth();
   const [libraryItems, setLibraryItems] = useState<UserLibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -272,5 +272,20 @@ export default function MyLibraryPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function MyLibraryPage() {
+  return (
+    <Suspense fallback={
+      <div className="w-full min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading library...</p>
+        </div>
+      </div>
+    }>
+      <MyLibraryContent />
+    </Suspense>
   );
 }
