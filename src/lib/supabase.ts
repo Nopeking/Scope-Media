@@ -5,24 +5,27 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Check required environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
+// Check required environment variables (only in browser/client-side)
+if (typeof window !== 'undefined' && (!supabaseUrl || !supabaseAnonKey)) {
   const missingVars = [];
   if (!supabaseUrl) missingVars.push('NEXT_PUBLIC_SUPABASE_URL');
   if (!supabaseAnonKey) missingVars.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
   
-  throw new Error(
+  console.error(
     `Required Supabase environment variables are not set. Missing: ${missingVars.join(', ')}. ` +
     'Please check your .env.local file.'
   );
 }
 
 // Client for public access (e.g., fetching data on client-side)
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || 'placeholder-key'
+);
 
 // Client for admin access (e.g., server-side operations with service role key)
 // Only create admin client if service role key is available (server-side only)
-export const supabaseAdmin = supabaseServiceRoleKey 
+export const supabaseAdmin = supabaseServiceRoleKey && supabaseUrl
   ? createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         persistSession: false,
