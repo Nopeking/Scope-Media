@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Custom scrollbar styles */
 .no-scrollbar::-webkit-scrollbar {
@@ -92,14 +94,14 @@ header {
 header[data-nav="true"] {
   backdrop-filter: blur(25px) !important;
   -webkit-backdrop-filter: blur(25px) !important;
-  background: rgba(30, 41, 59, 0.95) !important;
-  background-color: rgba(30, 41, 59, 0.95) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
   z-index: 50 !important;
 }
 
 .dark header[data-nav="true"] {
-  background: rgba(30, 41, 59, 0.95) !important;
-  background-color: rgba(30, 41, 59, 0.95) !important;
+  background: rgba(15, 23, 42, 0.9) !important;
+  background-color: rgba(15, 23, 42, 0.9) !important;
 }
 
 /* Ensure modal backdrop blocks interaction with background content */

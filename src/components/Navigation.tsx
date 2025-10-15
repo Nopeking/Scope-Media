@@ -19,13 +19,11 @@ const Navigation = () => {
 
   return (
         <header 
-          className="sticky top-0 z-50 w-full border-b border-slate-200/30 dark:border-slate-700/30" 
+          className="sticky top-0 z-50 w-full border-b border-slate-200/30 dark:border-slate-700/30 bg-white/90 dark:bg-slate-900/90" 
           data-nav="true"
           style={{ 
             backdropFilter: 'blur(25px)',
             WebkitBackdropFilter: 'blur(25px)',
-            backgroundColor: 'rgba(30, 41, 59, 0.95)',
-            background: 'rgba(30, 41, 59, 0.95)',
             position: 'sticky',
             top: 0
           }} 
