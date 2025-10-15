@@ -6,7 +6,13 @@ export async function GET(request: NextRequest) {
   try {
     console.log('📥 Fetching all users...');
 
-    const { data: users, error } = await getSupabaseAdmin()
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      console.log('⚠️ Supabase not configured, returning empty array');
+      return NextResponse.json([]);
+    }
+
+    const { data: users, error } = await supabaseAdmin
       .from('user_profiles')
       .select('*')
       .order('created_at', { ascending: false });
@@ -27,6 +33,11 @@ export async function GET(request: NextRequest) {
 // POST - Update user profile (admin only)
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const updates = await request.json();
     const { userId, ...profileUpdates } = updates;
 
@@ -36,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     console.log('📝 Updating user profile:', userId);
 
-    const { data: user, error } = await getSupabaseAdmin()
+    const { data: user, error } = await supabaseAdmin
       .from('user_profiles')
       .update(profileUpdates)
       .eq('id', userId)

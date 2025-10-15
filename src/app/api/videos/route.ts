@@ -7,7 +7,13 @@ export async function GET() {
   try {
     console.log('📥 Fetching videos...');
     
-        const { data: videos, error } = await getSupabaseAdmin()
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      console.log('⚠️ Supabase not configured, returning empty array');
+      return NextResponse.json([]);
+    }
+    
+        const { data: videos, error } = await supabaseAdmin
       .from('archived_videos')
       .select('*')
       .order('upload_date', { ascending: false });
@@ -49,6 +55,11 @@ export async function GET() {
 // POST - Add a new video
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const newVideo = await request.json();
     console.log('📝 Adding new video:', newVideo.title);
     
@@ -61,7 +72,7 @@ export async function POST(request: NextRequest) {
       thumbnail: newVideo.thumbnail || null
     };
     
-        const { data: video, error } = await getSupabaseAdmin()
+        const { data: video, error } = await supabaseAdmin
       .from('archived_videos')
       .insert(videoData)
       .select()
@@ -83,6 +94,11 @@ export async function POST(request: NextRequest) {
 // DELETE - Delete a video
 export async function DELETE(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     
@@ -92,7 +108,7 @@ export async function DELETE(request: NextRequest) {
     
     console.log('🗑️ Deleting video:', id);
     
-    const { error } = await getSupabaseAdmin()
+    const { error } = await supabaseAdmin
       .from('archived_videos')
       .delete()
       .eq('id', id);

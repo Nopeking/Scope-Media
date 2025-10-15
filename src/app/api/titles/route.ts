@@ -7,7 +7,13 @@ export async function GET() {
   try {
     console.log('📥 Fetching custom titles...');
     
-        const { data: titles, error } = await getSupabaseAdmin()
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      console.log('⚠️ Supabase not configured, returning empty array');
+      return NextResponse.json([]);
+    }
+    
+        const { data: titles, error } = await supabaseAdmin
       .from('custom_titles')
       .select('*')
       .order('created_at', { ascending: false });
@@ -30,10 +36,15 @@ export async function GET() {
 // POST - Add a new title
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const { title } = await request.json();
     console.log('📝 Adding new custom title:', title);
     
-    const { data: newTitle, error } = await getSupabaseAdmin()
+    const { data: newTitle, error } = await supabaseAdmin
       .from('custom_titles')
       .insert({ title })
       .select()
@@ -47,7 +58,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ Custom title added to Supabase successfully');
     
     // Return all titles for backward compatibility
-    const { data: allTitles } = await getSupabaseAdmin()
+    const { data: allTitles } = await supabaseAdmin
       .from('custom_titles')
       .select('title')
       .order('created_at', { ascending: false });
@@ -63,6 +74,11 @@ export async function POST(request: NextRequest) {
 // DELETE - Delete a title
 export async function DELETE(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const { searchParams } = new URL(request.url);
     const title = searchParams.get('title');
     
@@ -72,7 +88,7 @@ export async function DELETE(request: NextRequest) {
     
     console.log('🗑️ Deleting custom title:', title);
     
-    const { error } = await getSupabaseAdmin()
+    const { error } = await supabaseAdmin
       .from('custom_titles')
       .delete()
       .eq('title', title);

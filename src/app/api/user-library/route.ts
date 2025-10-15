@@ -5,6 +5,12 @@ import { UserLibraryItemInsert, UserLibraryItemUpdate } from '@/types';
 // GET - Fetch user library items
 export async function GET(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      console.log('⚠️ Supabase not configured, returning empty array');
+      return NextResponse.json([]);
+    }
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
@@ -14,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     console.log('📥 Fetching user library items for user:', userId);
 
-    const { data: libraryItems, error } = await getSupabaseAdmin()
+    const { data: libraryItems, error } = await supabaseAdmin
       .from('user_library')
       .select('*')
       .eq('user_id', userId)
@@ -36,6 +42,11 @@ export async function GET(request: NextRequest) {
 // POST - Add new library item
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const newItem = await request.json();
     console.log('📝 Adding new library item:', newItem.title);
 
@@ -61,7 +72,7 @@ export async function POST(request: NextRequest) {
       admin_uploader_id: newItem.admin_uploader_id || null,
     };
 
-    const { data: libraryItem, error } = await getSupabaseAdmin()
+    const { data: libraryItem, error } = await supabaseAdmin
       .from('user_library')
       .insert(libraryItemData)
       .select()
@@ -90,10 +101,15 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Item ID is required' }, { status: 400 });
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const updates = await request.json();
     console.log('📝 Updating library item:', itemId);
 
-    const { data: libraryItem, error } = await getSupabaseAdmin()
+    const { data: libraryItem, error } = await supabaseAdmin
       .from('user_library')
       .update(updates)
       .eq('id', itemId)
@@ -116,6 +132,11 @@ export async function PUT(request: NextRequest) {
 // DELETE - Delete library item
 export async function DELETE(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const { searchParams } = new URL(request.url);
     const itemId = searchParams.get('id');
     
@@ -125,7 +146,7 @@ export async function DELETE(request: NextRequest) {
 
     console.log('🗑️ Deleting library item:', itemId);
 
-    const { error } = await getSupabaseAdmin()
+    const { error } = await supabaseAdmin
       .from('user_library')
       .delete()
       .eq('id', itemId);

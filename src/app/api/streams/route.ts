@@ -7,7 +7,13 @@ export async function GET() {
   try {
     console.log('📥 Fetching streams...');
     
-        const { data: streams, error } = await getSupabaseAdmin()
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      console.log('⚠️ Supabase not configured, returning empty array');
+      return NextResponse.json([]);
+    }
+    
+        const { data: streams, error } = await supabaseAdmin
       .from('streams')
       .select('*')
       .order('created_at', { ascending: false });
@@ -28,10 +34,15 @@ export async function GET() {
 // POST - Add a new stream
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const newStream: StreamInsert = await request.json();
     console.log('📝 Adding new stream:', newStream.title);
     
-        const { data: stream, error } = await getSupabaseAdmin()
+        const { data: stream, error } = await supabaseAdmin
       .from('streams')
       .insert(newStream)
       .select()
@@ -53,6 +64,11 @@ export async function POST(request: NextRequest) {
 // DELETE - Delete a stream
 export async function DELETE(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     
@@ -62,7 +78,7 @@ export async function DELETE(request: NextRequest) {
     
     console.log('🗑️ Deleting stream:', id);
     
-    const { error } = await getSupabaseAdmin()
+    const { error } = await supabaseAdmin
       .from('streams')
       .delete()
       .eq('id', id);
