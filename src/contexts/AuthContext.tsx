@@ -25,6 +25,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -62,6 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     try {
       console.log('Fetching user profile for:', userId);
       
@@ -142,6 +152,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName?: string) => {
+    if (!supabase) {
+      return { error: { message: 'Supabase not configured' } };
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -160,6 +174,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
+    if (!supabase) {
+      return { error: { message: 'Supabase not configured' } };
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -173,11 +191,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user) return { error: new Error('No user logged in') };
+    if (!supabase) return { error: new Error('Supabase not configured') };
 
     try {
       const { data, error } = await supabase

@@ -18,10 +18,10 @@ if (typeof window !== 'undefined' && (!supabaseUrl || !supabaseAnonKey)) {
 }
 
 // Client for public access (e.g., fetching data on client-side)
-export const supabase = createClient<Database>(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder-key'
-);
+// Only create client if we have valid environment variables
+export const supabase = (supabaseUrl && supabaseAnonKey) 
+  ? createClient<Database>(supabaseUrl, supabaseAnonKey)
+  : null;
 
 // Client for admin access (e.g., server-side operations with service role key)
 // Only create admin client if service role key is available (server-side only)
