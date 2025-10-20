@@ -95,7 +95,7 @@ export default function PastShowsPage() {
         >
           <div className="flex items-center gap-4 mb-6">
             <Calendar className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-bold text-white bg-slate-900/80 px-4 py-2 rounded-lg">Filter by Month</h2>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white bg-white/80 dark:bg-slate-900/80 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">Filter by Month</h2>
           </div>
           
           <div className="flex flex-wrap gap-3">
@@ -104,7 +104,7 @@ export default function PastShowsPage() {
               className={`px-6 py-3 rounded-full font-medium transition-colors ${
                 selectedMonth === 'All'
                   ? 'bg-primary text-white'
-                  : 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600'
+                  : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600'
               }`}
             >
               All
@@ -116,7 +116,7 @@ export default function PastShowsPage() {
                 className={`px-6 py-3 rounded-full font-medium transition-colors ${
                   selectedMonth === month
                     ? 'bg-primary text-white'
-                    : 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600'
+                    : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600'
                 }`}
               >
                 {month}
@@ -134,7 +134,7 @@ export default function PastShowsPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: groupIndex * 0.1 }}
             >
-              <h3 className="text-2xl font-bold text-white mb-6 bg-slate-900/80 px-4 py-2 rounded-lg">{customTitle}</h3>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 bg-white/80 dark:bg-slate-900/80 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">{customTitle}</h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {shows.map((show, index) => (
@@ -167,10 +167,10 @@ export default function PastShowsPage() {
                     </div>
                     
                     <div>
-                      <h4 className="font-semibold text-white group-hover:text-primary transition-colors mb-2 bg-slate-900/80 px-3 py-2 rounded-lg">
+                      <h4 className="font-semibold text-slate-900 dark:text-white group-hover:text-primary transition-colors mb-2 bg-white/80 dark:bg-slate-900/80 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
                         {show.title}
                       </h4>
-                      <div className="flex items-center gap-2 text-sm text-slate-300 bg-slate-800/80 px-3 py-2 rounded-lg">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
                         <Calendar className="h-4 w-4" />
                         {new Date(show.uploadDate).toLocaleDateString('en-US', {
                           year: 'numeric',
@@ -195,8 +195,8 @@ export default function PastShowsPage() {
             className="text-center py-12"
           >
             <Calendar className="h-16 w-16 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-600 mb-2">No shows found</h3>
-            <p className="text-slate-500">Try selecting a different month or check back later for new content.</p>
+            <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-400 mb-2">No shows found</h3>
+            <p className="text-slate-500 dark:text-slate-500">Try selecting a different month or check back later for new content.</p>
           </motion.div>
         )}
       </div>

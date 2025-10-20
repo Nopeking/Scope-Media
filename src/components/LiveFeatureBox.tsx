@@ -47,9 +47,13 @@ const LiveFeatureBox: React.FC<LiveFeatureBoxProps> = ({ liveStreams, recentVide
         }
       }}
     >
-      <section className="mt-12">
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-4">Live Now</h2>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <section className="mt-8 sm:mt-12 mb-12 sm:mb-16">
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <div className="flex items-center gap-3 mb-4 sm:mb-6">
+            <div className="w-1 h-6 sm:h-8 bg-red-500 rounded-full"></div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">Live Now</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {liveStreams.map((stream) => (
             <motion.div key={stream.id} className="group flex flex-col gap-3" variants={itemVariants}>
               <div 
@@ -82,12 +86,26 @@ const LiveFeatureBox: React.FC<LiveFeatureBoxProps> = ({ liveStreams, recentVide
               </div>
             </motion.div>
           ))}
+          </div>
         </div>
       </section>
 
-      <section className="mt-12">
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-4">Recently Added Videos</h2>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {/* Divider */}
+      <div className="flex items-center justify-center my-6 sm:my-8">
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300 dark:via-slate-600 to-transparent"></div>
+        <div className="mx-4 px-3 py-1 bg-white dark:bg-slate-900 rounded-full border border-slate-200 dark:border-slate-700">
+          <span className="text-sm font-medium text-slate-600 dark:text-slate-400">• • •</span>
+        </div>
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300 dark:via-slate-600 to-transparent"></div>
+      </div>
+
+      <section className="mt-6 sm:mt-8 mb-8 sm:mb-12">
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <div className="flex items-center gap-3 mb-4 sm:mb-6">
+            <div className="w-1 h-6 sm:h-8 bg-primary rounded-full"></div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">Recently Added Videos</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {recentVideos.map((video) => (
             <motion.div key={video.id} className="group flex flex-col gap-3" variants={itemVariants}>
               <div 
@@ -111,6 +129,7 @@ const LiveFeatureBox: React.FC<LiveFeatureBoxProps> = ({ liveStreams, recentVide
               </div>
             </motion.div>
           ))}
+          </div>
         </div>
       </section>
     </motion.div>

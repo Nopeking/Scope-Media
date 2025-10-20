@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Paper texture background */
+body {
+  background-image: 
+    radial-gradient(circle at 25px 25px, rgba(0,0,0,0.02) 2px, transparent 0),
+    radial-gradient(circle at 75px 75px, rgba(0,0,0,0.02) 2px, transparent 0);
+  background-size: 100px 100px;
+  background-color: #fafafa;
+  background-attachment: fixed;
+}
+
+.dark body {
+  background-image: 
+    radial-gradient(circle at 25px 25px, rgba(255,255,255,0.02) 2px, transparent 0),
+    radial-gradient(circle at 75px 75px, rgba(255,255,255,0.02) 2px, transparent 0);
+  background-color: #0f1419;
+}
+
 /* Custom scrollbar styles */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

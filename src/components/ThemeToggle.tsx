@@ -14,14 +14,14 @@ export default function ThemeToggle() {
     return (
       <button
         onClick={toggleTheme}
-        className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+        className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
         aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
         suppressHydrationWarning
       >
         {theme === 'light' ? (
-          <Moon className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+          <Moon className="h-4 w-4 sm:h-5 sm:w-5 text-slate-600 dark:text-slate-400" />
         ) : (
-          <Sun className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+          <Sun className="h-4 w-4 sm:h-5 sm:w-5 text-slate-600 dark:text-slate-400" />
         )}
       </button>
     );

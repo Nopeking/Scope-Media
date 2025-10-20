@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import LiveFeatureBox from '@/components/LiveFeatureBox';
 import VideoPlayer from '@/components/VideoPlayer';
 import NoSSR from '@/components/NoSSR';
 
 export default function Home() {
+  const router = useRouter();
   const [liveStreams, setLiveStreams] = useState<any[]>([]);
   const [recentVideos, setRecentVideos] = useState<any[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
@@ -45,6 +47,15 @@ export default function Home() {
     setShowVideoModal(true);
   };
 
+  // Handle hero button clicks
+  const handleWatchLiveClick = () => {
+    router.push('/live');
+  };
+
+  const handleBrowseVideosClick = () => {
+    router.push('/past-shows');
+  };
+
   if (isLoading) {
     return (
       <NoSSR fallback={
@@ -75,17 +86,17 @@ export default function Home() {
             backgroundImage: 'linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 40%), url("https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3")'
           }}
         />
-        <div className="container mx-auto px-4 py-16 sm:px-6 lg:px-8 relative z-10">
+        <div className="container mx-auto px-4 py-12 sm:py-16 sm:px-6 lg:px-8 relative z-10">
           <div className="max-w-4xl">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
-                  <h1 className="text-4xl font-bold text-white md:text-6xl mb-6">
+                  <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight">
                     Welcome to Scope Media
                   </h1>
-              <p className="text-xl text-slate-200 max-w-2xl mb-8">
+              <p className="text-lg sm:text-xl text-slate-200 max-w-2xl mb-6 sm:mb-8 leading-relaxed">
                 Your one-stop destination for the best live streams and video content.
                 Experience premium quality streaming with our custom video player.
               </p>
@@ -95,10 +106,16 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
               >
-                <button className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-lg font-semibold transition-colors">
+                <button 
+                  onClick={handleWatchLiveClick}
+                  className="bg-primary hover:bg-primary/90 text-white px-6 py-3 sm:px-8 rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                >
                   Watch Live Now
                 </button>
-                <button className="border-2 border-white text-white hover:bg-white hover:text-slate-900 px-8 py-3 rounded-lg font-semibold transition-colors">
+                <button 
+                  onClick={handleBrowseVideosClick}
+                  className="border-2 border-white text-white hover:bg-white hover:text-slate-900 px-6 py-3 sm:px-8 rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                >
                   Browse Videos
                 </button>
               </motion.div>
@@ -108,7 +125,7 @@ export default function Home() {
       </section>
 
           {/* Main Content */}
-          <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
+          <div className="container mx-auto px-4 py-6 sm:py-8 sm:px-6 lg:px-8">
             <NoSSR fallback={
               <div className="text-center py-16 bg-white rounded-xl shadow-sm">
                 <div className="max-w-md mx-auto">
@@ -138,20 +155,10 @@ export default function Home() {
                       </svg>
                     </div>
                     <h2 className="text-2xl font-bold text-slate-900 mb-4">No Content Available</h2>
-                    <p className="text-slate-700 mb-6">
-                      Content will appear here once it's added through the admin panel. 
+                    <p className="text-slate-700">
+                      Content will appear here once it's available. 
                       Check back later for live streams and archived videos.
                     </p>
-                    <a 
-                      href="/admin" 
-                      className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      Admin Panel
-                    </a>
                   </div>
                 </motion.div>
               ) : (
