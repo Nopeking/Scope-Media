@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Upload, Video, Image, FileText, Trash2, Edit, Share2, Eye, Download } from 'lucide-react';
+import { Video, Image, FileText, Eye, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserLibraryItem } from '@/types';
 import AuthModal from '@/components/AuthModal';
@@ -15,7 +15,6 @@ function MyLibraryContent() {
   const [loading, setLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [filter, setFilter] = useState<'all' | 'video' | 'photo' | 'document'>('all');
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const searchParams = useSearchParams();
   const userIdParam = searchParams.get('userId');
 
@@ -129,15 +128,6 @@ function MyLibraryContent() {
               }
             </p>
           </div>
-          {!userIdParam && (
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="mt-4 sm:mt-0 bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Upload Content
-            </button>
-          )}
         </div>
 
         {/* Filter Tabs */}
@@ -165,22 +155,18 @@ function MyLibraryContent() {
         {/* Library Grid */}
         {filteredItems.length === 0 ? (
           <div className="text-center py-12">
-            <Upload className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+            <div className="h-16 w-16 text-slate-400 mx-auto mb-4 flex items-center justify-center">
+              <Video className="h-8 w-8" />
+            </div>
             <h3 className="text-xl font-semibold text-slate-800 mb-2">
               {filter === 'all' ? 'No items in your library yet' : `No ${filter}s found`}
             </h3>
-            <p className="text-slate-600 mb-6">
+            <p className="text-slate-600">
               {filter === 'all' 
-                ? 'Start by uploading your first piece of content'
-                : `Try uploading some ${filter}s or check other categories`
+                ? 'Your personal library will appear here once content is available'
+                : `No ${filter}s available at the moment`
               }
             </p>
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Upload Content
-            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -250,21 +236,6 @@ function MyLibraryContent() {
           </div>
         )}
 
-        {/* Upload Modal Placeholder */}
-        {showUploadModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-              <h3 className="text-xl font-bold text-slate-800 mb-4">Upload Content</h3>
-              <p className="text-slate-600 mb-6">Upload functionality coming soon!</p>
-              <button
-                onClick={() => setShowUploadModal(false)}
-                className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
 
         <AuthModal 
           isOpen={showAuthModal} 
