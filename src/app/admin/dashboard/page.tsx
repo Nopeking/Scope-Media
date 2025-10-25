@@ -1,41 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, Play, Pause, Upload, Users, Eye, Settings } from 'lucide-react';
+import { LiveStream, ArchivedVideo } from '@/types';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 // Initial data arrays - will be populated when content is added
-const initialLiveStreams: any[] = [];
-const initialArchivedVideos: any[] = [];
+const initialLiveStreams: LiveStream[] = [];
+const initialArchivedVideos: ArchivedVideo[] = [];
 const initialCustomTitles: string[] = ['Tech Conferences', 'Cooking Shows', 'Music Events'];
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalType, setModalType] = useState('content'); // 'content', 'stream', 'video', 'title'
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
   
-  // State for managing content - load from localStorage on mount
-  const [liveStreams, setLiveStreams] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('liveStreams');
-      return stored ? JSON.parse(stored) : initialLiveStreams;
-    }
-    return initialLiveStreams;
-  });
-  const [archivedVideos, setArchivedVideos] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('archivedVideos');
-      return stored ? JSON.parse(stored) : initialArchivedVideos;
-    }
-    return initialArchivedVideos;
-  });
-  const [customTitles, setCustomTitles] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('customTitles');
-      return stored ? JSON.parse(stored) : initialCustomTitles;
-    }
-    return initialCustomTitles;
-  });
+  // State for managing content
+  const [liveStreams, setLiveStreams] = useState<LiveStream[]>(initialLiveStreams);
+  const [archivedVideos, setArchivedVideos] = useState<ArchivedVideo[]>(initialArchivedVideos);
+  const [customTitles, setCustomTitles] = useState<string[]>(initialCustomTitles);
+  const [users, setUsers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -48,6 +38,46 @@ export default function AdminDashboard() {
   // File upload state
   const [uploadedThumbnail, setUploadedThumbnail] = useState<string | null>(null);
 
+  // Initialize tab from URL parameter
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['overview', 'live-streams', 'archived-videos', 'custom-titles', 'users'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  // Fetch data from API on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [streamsRes, videosRes, titlesRes, usersRes] = await Promise.all([
+          fetch('/api/streams'),
+          fetch('/api/videos'),
+          fetch('/api/titles'),
+          fetch('/api/users')
+        ]);
+        
+        const streams = await streamsRes.json();
+        const videos = await videosRes.json();
+        const titles = await titlesRes.json();
+        const usersData = await usersRes.json();
+        
+        setLiveStreams(streams);
+        setArchivedVideos(videos);
+        setCustomTitles(titles);
+        setUsers(usersData);
+        console.log('Users data received:', usersData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Eye },
     { id: 'live-streams', label: 'Live Streams', icon: Play },
@@ -55,6 +85,47 @@ export default function AdminDashboard() {
     { id: 'custom-titles', label: 'Custom Titles', icon: Settings },
     { id: 'users', label: 'Users', icon: Users },
   ];
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    // Update URL without page refresh
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tabId);
+    router.replace(url.pathname + url.search);
+  };
+
+  const handleEditUser = (user: any) => {
+    setEditingUser(user);
+    setShowEditUserModal(true);
+  };
+
+  const handleUpdateUser = async (updatedUser: any) => {
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: updatedUser.id,
+          ...updatedUser
+        }),
+      });
+
+      if (response.ok) {
+        // Update the users list
+        setUsers(users.map(user => 
+          user.id === updatedUser.id ? { ...user, ...updatedUser } : user
+        ));
+        setShowEditUserModal(false);
+        setEditingUser(null);
+      } else {
+        console.error('Failed to update user');
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+    }
+  };
 
   // Function to handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -95,7 +166,7 @@ export default function AdminDashboard() {
   };
 
   // Function to add new content
-  const handleAddContent = () => {
+  const handleAddContent = async () => {
     // Validate based on modal type
     if (modalType === 'stream') {
       if (!formData.title || !formData.url) {
@@ -114,59 +185,80 @@ export default function AdminDashboard() {
       }
     }
 
-    if (modalType === 'stream') {
-      const newStream = {
-        id: Date.now().toString(),
-        title: formData.title,
-        url: formData.url,
-        thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
-        status: 'live',
-        viewers: Math.floor(Math.random() * 1000) + 100,
-        date: new Date().toLocaleDateString()
-      };
-      
-      setLiveStreams(prev => {
-        const updated = [...prev, newStream];
-        localStorage.setItem('liveStreams', JSON.stringify(updated));
-        return updated;
-      });
-      console.log('Live stream added:', newStream);
-    } else if (modalType === 'video') {
-      const newVideo = {
-        id: Date.now().toString(),
-        title: formData.title,
-        url: formData.url,
-        thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
-        duration: '00:00', // Placeholder, ideally fetched from YouTube API
-        uploadDate: new Date().toLocaleDateString(),
-        customTitle: formData.customTitle,
-        month: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-      };
-      
-      setArchivedVideos(prev => {
-        const updated = [...prev, newVideo];
-        localStorage.setItem('archivedVideos', JSON.stringify(updated));
-        return updated;
-      });
-      console.log('Archived video added:', newVideo);
-      console.log('Video URL:', newVideo.url);
-      console.log('Video URL type:', typeof newVideo.url);
-      console.log('Video URL length:', newVideo.url?.length);
-    } else if (modalType === 'title') {
-      if (formData.title.trim() && !customTitles.includes(formData.title.trim())) {
-        setCustomTitles(prev => {
-          const updated = [...prev, formData.title.trim()];
-          localStorage.setItem('customTitles', JSON.stringify(updated));
-          return updated;
+    try {
+      if (modalType === 'stream') {
+        const newStream = {
+          id: Date.now().toString(),
+          title: formData.title,
+          url: formData.url,
+          thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
+          status: 'live',
+          viewers: Math.floor(Math.random() * 1000) + 100,
+          date: new Date().toLocaleDateString()
+        };
+        
+        const response = await fetch('/api/streams', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newStream)
         });
-        console.log('Custom title added:', formData.title.trim());
+        
+        if (response.ok) {
+          setLiveStreams((prev: LiveStream[]) => [newStream, ...prev]);
+          console.log('✅ Stream added to UI');
+        } else {
+          throw new Error('Failed to add stream');
+        }
+      } else if (modalType === 'video') {
+        const newVideo = {
+          id: Date.now().toString(),
+          title: formData.title,
+          url: formData.url,
+          thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
+          duration: '00:00', // Placeholder, ideally fetched from YouTube API
+          uploadDate: new Date().toLocaleDateString(),
+          customTitle: formData.customTitle,
+          month: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        };
+        
+        const response = await fetch('/api/videos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newVideo)
+        });
+        
+        if (response.ok) {
+          setArchivedVideos((prev: ArchivedVideo[]) => [newVideo, ...prev]);
+          console.log('✅ Video added to UI');
+        } else {
+          throw new Error('Failed to add video');
+        }
+      } else if (modalType === 'title') {
+        if (formData.title.trim() && !customTitles.includes(formData.title.trim())) {
+          const response = await fetch('/api/titles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: formData.title.trim() })
+          });
+          
+          if (response.ok) {
+            const updatedTitles = await response.json();
+            setCustomTitles(updatedTitles);
+          } else {
+            throw new Error('Failed to add title');
+          }
+        }
       }
-    }
 
-    // Reset form and close modal
-    setFormData({ title: '', url: '', customTitle: '', thumbnail: '' });
-    setUploadedThumbnail(null);
-    setShowAddModal(false);
+      // Reset form and close modal
+      setFormData({ title: '', url: '', customTitle: '', thumbnail: '' });
+      setUploadedThumbnail(null);
+      setShowAddModal(false);
+    } catch (error: any) {
+      console.error('❌ Error adding content:', error);
+      const errorMessage = error.message || 'Unknown error';
+      alert(`Failed to add content: ${errorMessage}\n\nCheck the browser console for more details.`);
+    }
   };
 
   // Function to extract YouTube video ID from URL
@@ -177,66 +269,106 @@ export default function AdminDashboard() {
   };
 
   // Function to delete content
-  const handleDeleteContent = (id: string, type: 'stream' | 'video' | 'title') => {
-    if (type === 'stream') {
-      setLiveStreams(prev => {
-        const updated = prev.filter(item => item.id !== id);
-        localStorage.setItem('liveStreams', JSON.stringify(updated));
-        return updated;
-      });
-    } else if (type === 'video') {
-      setArchivedVideos(prev => {
-        const updated = prev.filter(item => item.id !== id);
-        localStorage.setItem('archivedVideos', JSON.stringify(updated));
-        return updated;
-      });
-    } else if (type === 'title') {
-      setCustomTitles(prev => {
-        const updated = prev.filter(title => title !== id);
-        localStorage.setItem('customTitles', JSON.stringify(updated));
-        return updated;
-      });
+  const handleDeleteContent = async (id: string, type: 'stream' | 'video' | 'title') => {
+    try {
+      console.log(`🗑️ Attempting to delete ${type}:`, id);
+      
+      if (type === 'stream') {
+        const response = await fetch(`/api/streams?id=${id}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          setLiveStreams((prev: LiveStream[]) => prev.filter(item => item.id !== id));
+          console.log('✅ Stream deleted from UI');
+        } else {
+          const error = await response.json();
+          throw new Error(error.details || error.error || 'Failed to delete stream');
+        }
+      } else if (type === 'video') {
+        const response = await fetch(`/api/videos?id=${id}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          setArchivedVideos((prev: ArchivedVideo[]) => prev.filter(item => item.id !== id));
+          console.log('✅ Video deleted from UI');
+        } else {
+          const error = await response.json();
+          throw new Error(error.details || error.error || 'Failed to delete video');
+        }
+      } else if (type === 'title') {
+        const response = await fetch(`/api/titles?title=${encodeURIComponent(id)}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          setCustomTitles((prev: string[]) => prev.filter(title => title !== id));
+          console.log('✅ Title deleted from UI');
+        } else {
+          const error = await response.json();
+          throw new Error(error.details || error.error || 'Failed to delete title');
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Error deleting content:', error);
+      alert(`Failed to delete content: ${error.message}\n\nCheck console for details.`);
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50" suppressHydrationWarning>
+    <div className="min-h-screen bg-slate-50 admin-panel" suppressHydrationWarning>
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-slate-200" suppressHydrationWarning>
-        <div className="container mx-auto px-4 py-4 sm:px-6 lg:px-8" suppressHydrationWarning>
-          <div className="flex items-center justify-between" suppressHydrationWarning>
-            <div className="flex items-center gap-3" suppressHydrationWarning>
-              <svg className="h-8 w-8 text-primary" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                <path d="M36.7273 44C33.9891 44 31.6043 39.8386 30.3636 33.69C29.123 39.8386 26.7382 44 24 44C21.2618 44 18.877 39.8386 17.6364 33.69C16.3957 39.8386 14.0109 44 11.2727 44C7.25611 44 4 35.0457 4 24C4 12.9543 7.25611 4 11.2727 4C14.0109 4 16.3957 8.16144 17.6364 14.31C18.877 8.16144 21.2618 4 24 4C26.7382 4 29.123 8.16144 30.3636 14.31C31.6043 8.16144 33.9891 4 36.7273 4C40.7439 4 44 12.9543 44 24C44 35.0457 40.7439 44 36.7273 44Z" fill="currentColor"></path>
-              </svg>
-                  <h1 className="text-2xl font-bold text-slate-800">Scope Media - Admin Dashboard</h1>
+        <div className="container mx-auto px-4 py-3 sm:py-4 sm:px-6 lg:px-8" suppressHydrationWarning>
+          <div className="flex items-center justify-between gap-2" suppressHydrationWarning>
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0" suppressHydrationWarning>
+              <img 
+                src="/logo.png" 
+                alt="Scope Media Logo" 
+                className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 object-contain flex-shrink-0"
+              />
+              <h1 className="text-base sm:text-xl md:text-2xl font-bold text-slate-800 truncate">
+                Scope Media - Admin Dashboard
+              </h1>
             </div>
-            <button className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+            <button className="bg-primary hover:bg-primary/90 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors flex-shrink-0">
               Logout
             </button>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8" suppressHydrationWarning>
-        <div className="flex flex-col lg:flex-row gap-8" suppressHydrationWarning>
+      <div className="container mx-auto px-4 py-4 sm:py-8 sm:px-6 lg:px-8" suppressHydrationWarning>
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-8" suppressHydrationWarning>
           {/* Sidebar */}
           <aside className="lg:w-64" suppressHydrationWarning>
-            <nav className="space-y-2">
+            <nav className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 -mx-4 px-4 lg:mx-0 lg:px-0">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`flex items-center gap-2 lg:gap-3 px-3 py-2 lg:px-4 lg:py-3 rounded-lg text-left transition-colors whitespace-nowrap flex-shrink-0 lg:w-full text-sm lg:text-base ${
                       activeTab === tab.id
                         ? 'bg-primary text-white'
                         : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <Icon className="h-5 w-5" />
-                    {tab.label}
+                    <Icon className="h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0" />
+                    <span>{tab.label}</span>
                   </button>
                 );
               })}
@@ -249,69 +381,69 @@ export default function AdminDashboard() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
+                className="space-y-4 sm:space-y-6"
               >
-                <div className="flex items-center justify-between" suppressHydrationWarning>
-                  <h2 className="text-3xl font-bold text-slate-800">Overview</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" suppressHydrationWarning>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Overview</h2>
                   <button
                     onClick={() => {
                       setModalType('content');
                       setShowAddModal(true);
                     }}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                     suppressHydrationWarning
                   >
-                    <Plus className="h-5 w-5" />
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                     Add Content
                   </button>
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" suppressHydrationWarning>
-                  <div className="bg-white p-6 rounded-xl shadow-sm" suppressHydrationWarning>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6" suppressHydrationWarning>
+                  <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm" suppressHydrationWarning>
                     <div className="flex items-center gap-3" suppressHydrationWarning>
-                      <div className="p-3 bg-green-100 rounded-lg" suppressHydrationWarning>
-                        <Play className="h-6 w-6 text-green-600" />
+                      <div className="p-2 sm:p-3 bg-green-100 rounded-lg flex-shrink-0" suppressHydrationWarning>
+                        <Play className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
                       </div>
                       <div suppressHydrationWarning>
-                        <p className="text-sm text-slate-600">Active Streams</p>
-                            <p className="text-2xl font-bold text-slate-800">{liveStreams.length}</p>
+                        <p className="text-xs sm:text-sm text-slate-600">Active Streams</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-800">{liveStreams.length}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl shadow-sm" suppressHydrationWarning>
+                  <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm" suppressHydrationWarning>
                     <div className="flex items-center gap-3" suppressHydrationWarning>
-                      <div className="p-3 bg-blue-100 rounded-lg" suppressHydrationWarning>
-                        <Eye className="h-6 w-6 text-blue-600" />
+                      <div className="p-2 sm:p-3 bg-blue-100 rounded-lg flex-shrink-0" suppressHydrationWarning>
+                        <Eye className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                       </div>
                           <div suppressHydrationWarning>
-                            <p className="text-sm text-slate-600">Total Viewers</p>
-                            <p className="text-2xl font-bold text-slate-800">{liveStreams.reduce((sum, stream) => sum + (stream.viewers || 0), 0)}</p>
+                        <p className="text-xs sm:text-sm text-slate-600">Total Viewers</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-800">{liveStreams.reduce((sum: number, stream) => sum + (stream.viewers || 0), 0)}</p>
                           </div>
                     </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl shadow-sm" suppressHydrationWarning>
+                  <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm" suppressHydrationWarning>
                     <div className="flex items-center gap-3" suppressHydrationWarning>
-                      <div className="p-3 bg-purple-100 rounded-lg" suppressHydrationWarning>
-                        <Pause className="h-6 w-6 text-purple-600" />
+                      <div className="p-2 sm:p-3 bg-purple-100 rounded-lg flex-shrink-0" suppressHydrationWarning>
+                        <Pause className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
                       </div>
                           <div suppressHydrationWarning>
-                            <p className="text-sm text-slate-600">Archived Videos</p>
-                            <p className="text-2xl font-bold text-slate-800">{archivedVideos.length}</p>
+                        <p className="text-xs sm:text-sm text-slate-600">Archived Videos</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-800">{archivedVideos.length}</p>
                           </div>
                     </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl shadow-sm" suppressHydrationWarning>
+                  <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm" suppressHydrationWarning>
                     <div className="flex items-center gap-3" suppressHydrationWarning>
-                      <div className="p-3 bg-orange-100 rounded-lg" suppressHydrationWarning>
-                        <Settings className="h-6 w-6 text-orange-600" />
+                      <div className="p-2 sm:p-3 bg-orange-100 rounded-lg flex-shrink-0" suppressHydrationWarning>
+                        <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
                       </div>
                           <div suppressHydrationWarning>
-                            <p className="text-sm text-slate-600">Custom Titles</p>
-                            <p className="text-2xl font-bold text-slate-800">{customTitles.length}</p>
+                        <p className="text-xs sm:text-sm text-slate-600">Custom Titles</p>
+                        <p className="text-xl sm:text-2xl font-bold text-slate-800">{customTitles.length}</p>
                           </div>
                     </div>
                   </div>
@@ -323,40 +455,96 @@ export default function AdminDashboard() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
+                className="space-y-4 sm:space-y-6"
               >
-                <div className="flex items-center justify-between" suppressHydrationWarning>
-                  <h2 className="text-3xl font-bold text-slate-800">Live Streams</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" suppressHydrationWarning>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Live Streams</h2>
                   <button 
                     onClick={() => {
                       console.log('Add Stream button clicked!');
                       setModalType('stream');
                       setShowAddModal(true);
                     }}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                     suppressHydrationWarning
                   >
-                    <Plus className="h-5 w-5" />
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                     Add Stream
                   </button>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  <div className="overflow-x-auto">
+                  {/* Mobile Card View */}
+                  <div className="block md:hidden">
+                    {liveStreams.length === 0 ? (
+                      <div className="p-6 text-center text-slate-500">
+                        No live streams yet. Click "Add Stream" to create one.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-200">
+                        {liveStreams.map((stream) => (
+                          <div key={stream.id} className="p-4">
+                            <div className="flex items-start gap-3">
+                              <img 
+                                src={stream.thumbnail} 
+                                alt={stream.title}
+                                className="w-20 h-14 object-cover rounded flex-shrink-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-slate-900 truncate">{stream.title}</h3>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    stream.status === 'live' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {stream.status}
+                                  </span>
+                                  <span className="text-xs text-slate-500">{(stream.viewers || 0).toLocaleString()} viewers</span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1 truncate">{stream.url}</p>
+                              </div>
+                              <div className="flex flex-col gap-2 flex-shrink-0">
+                                <button className="text-blue-500 hover:text-blue-700 p-1">
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteContent(stream.id, 'stream')}
+                                  className="text-red-600 hover:text-red-500 p-1"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-slate-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Title</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Viewers</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">RTMP URL</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                          <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Title</th>
+                          <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                          <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Viewers</th>
+                          <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">RTMP URL</th>
+                          <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
                           <tbody className="divide-y divide-slate-200">
-                            {liveStreams.map((stream) => (
+                        {liveStreams.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                              No live streams yet. Click "Add Stream" to create one.
+                            </td>
+                          </tr>
+                        ) : (
+                          liveStreams.map((stream) => (
                           <tr key={stream.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                              <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                               <div className="flex items-center gap-3">
                                 <img 
                                   src={stream.thumbnail} 
@@ -366,7 +554,7 @@ export default function AdminDashboard() {
                                 {stream.title}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                 stream.status === 'live' 
                                   ? 'bg-green-100 text-green-800' 
@@ -375,13 +563,13 @@ export default function AdminDashboard() {
                                 {stream.status}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                              {stream.viewers.toLocaleString()}
+                              <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                                {(stream.viewers || 0).toLocaleString()}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                              <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-slate-500 max-w-xs truncate">
                               {stream.url}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                              <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                               <div className="flex items-center gap-2">
                                 <button className="text-blue-500 hover:text-blue-700">
                                   <Edit className="h-4 w-4" />
@@ -395,7 +583,8 @@ export default function AdminDashboard() {
                               </div>
                             </td>
                           </tr>
-                        ))}
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -407,57 +596,61 @@ export default function AdminDashboard() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
+                className="space-y-4 sm:space-y-6"
               >
-                <div className="flex items-center justify-between" suppressHydrationWarning>
-                  <h2 className="text-3xl font-bold text-slate-800">Archived Videos</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" suppressHydrationWarning>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Archived Videos</h2>
                   <button 
                     onClick={() => {
                       console.log('Upload Video button clicked!');
                       setModalType('video');
                       setShowAddModal(true);
                     }}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                     suppressHydrationWarning
                   >
-                    <Upload className="h-5 w-5" />
+                    <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
                     Upload Video
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                  {archivedVideos.map((video) => (
-                    <div key={video.id} className="bg-white p-6 rounded-xl shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 flex-1">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                  {archivedVideos.length === 0 ? (
+                    <div className="bg-white p-6 rounded-xl shadow-sm text-center text-slate-500">
+                      No archived videos yet. Click "Upload Video" to add one.
+                    </div>
+                  ) : (
+                    archivedVideos.map((video) => (
+                      <div key={video.id} className="bg-white p-4 sm:p-6 rounded-xl shadow-sm">
+                        <div className="flex items-start gap-3 sm:gap-4">
                           <img 
                             src={video.thumbnail} 
                             alt={video.title}
-                            className="w-16 h-12 object-cover rounded-lg"
+                            className="w-20 h-14 sm:w-24 sm:h-16 object-cover rounded-lg flex-shrink-0"
                           />
-                          <div>
-                            <h3 className="text-lg font-semibold text-slate-800">{video.title}</h3>
-                            <div className="flex items-center gap-4 mt-2 text-sm text-slate-600">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-base sm:text-lg font-semibold text-slate-800 truncate">{video.title}</h3>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-2 text-xs sm:text-sm text-slate-600">
                               <span>Duration: {video.duration}</span>
                               <span>Uploaded: {video.uploadDate}</span>
-                              <span>Group: {video.customTitle}</span>
+                              <span className="truncate">Group: {video.customTitle}</span>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button className="text-blue-500 hover:text-blue-700">
-                          <Edit className="h-5 w-5" />
+                          <div className="flex flex-col sm:flex-row items-center gap-2 flex-shrink-0">
+                            <button className="text-blue-500 hover:text-blue-700 p-1">
+                              <Edit className="h-4 w-4 sm:h-5 sm:w-5" />
                         </button>
                         <button 
                           onClick={() => handleDeleteContent(video.id, 'video')}
-                          className="text-red-600 hover:text-red-500"
+                              className="text-red-600 hover:text-red-500 p-1"
                         >
-                          <Trash2 className="h-5 w-5" />
+                              <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
                         </button>
                       </div>
                     </div>
-                  ))}
+                      </div>
+                    ))
+                  )}
                 </div>
               </motion.div>
             )}
@@ -514,14 +707,98 @@ export default function AdminDashboard() {
               >
                 <div className="flex items-center justify-between">
                   <h2 className="text-3xl font-bold text-slate-800">User Management</h2>
-                  <button className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
+                  <button 
+                    onClick={() => {
+                      setModalType('user');
+                      setShowAddModal(true);
+                    }}
+                    className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                  >
                     <Plus className="h-5 w-5" />
                     Add User
                   </button>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <p className="text-slate-600">User management features will be available in future updates.</p>
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="p-6">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold text-slate-800 mb-2">All Users</h3>
+                      <p className="text-slate-600">Manage user accounts and their libraries</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {users.length > 0 ? (
+                        users.map((user) => {
+                          const initials = user.full_name 
+                            ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+                            : user.email.substring(0, 2).toUpperCase();
+                          
+                          const planColors = {
+                            free: 'text-blue-600',
+                            premium: 'text-green-600',
+                            enterprise: 'text-purple-600'
+                          };
+
+                          const joinDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A';
+
+                          return (
+                            <div key={user.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                                  <span className="text-white font-semibold text-sm">{initials}</span>
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-slate-800">{user.full_name || 'User'}</h4>
+                                  <p className="text-sm text-slate-500">{user.email}</p>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-600">Plan:</span>
+                                  <span className={`font-medium ${planColors[user.subscription_plan as keyof typeof planColors] || 'text-slate-600'}`}>
+                                    {user.subscription_plan?.charAt(0).toUpperCase() + user.subscription_plan?.slice(1)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-600">User ID:</span>
+                                  <span className="font-medium text-xs text-slate-800 bg-slate-100 px-2 py-1 rounded">
+                                    {user.id ? user.id.substring(0, 8) + '...' : 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-slate-600">Joined:</span>
+                                  <span className="font-medium text-slate-800">
+                                    {user.created_at ? joinDate : 'N/A'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 mt-3">
+                                <button 
+                                  onClick={() => {
+                                    // Navigate to user's library
+                                    window.open(`/my-library?userId=${user.id}`, '_blank');
+                                  }}
+                                  className="flex-1 bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors"
+                                >
+                                  View Library
+                                </button>
+                                <button 
+                                  onClick={() => handleEditUser(user)}
+                                  className="flex-1 bg-slate-100 text-slate-600 px-3 py-1 rounded text-sm hover:bg-slate-200 transition-colors"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="col-span-full text-center py-8">
+                          <p className="text-slate-500">No users found. Users will appear here once they sign up.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -535,7 +812,7 @@ export default function AdminDashboard() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow-2xl w-full max-w-md"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-md modal"
           >
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
@@ -776,6 +1053,120 @@ export default function AdminDashboard() {
           </motion.div>
         </div>
       )}
+
+      {/* Edit User Modal */}
+      {showEditUserModal && editingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" suppressHydrationWarning>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl shadow-2xl w-full max-w-md"
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-slate-800">Edit User</h3>
+                <button
+                  onClick={() => {
+                    setShowEditUserModal(false);
+                    setEditingUser(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target as HTMLFormElement);
+                const updatedUser = {
+                  id: editingUser.id,
+                  email: formData.get('email') as string,
+                  full_name: formData.get('full_name') as string,
+                  subscription_plan: formData.get('subscription_plan') as string,
+                };
+                handleUpdateUser(updatedUser);
+              }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    defaultValue={editingUser.email}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    name="full_name"
+                    defaultValue={editingUser.full_name || ''}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Subscription Plan
+                  </label>
+                  <select
+                    name="subscription_plan"
+                    defaultValue={editingUser.subscription_plan}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="free">Free</option>
+                    <option value="premium">Premium</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditUserModal(false);
+                      setEditingUser(null);
+                    }}
+                    className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    Update User
+                  </button>
+                </div>
+              </form>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="w-full min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading admin dashboard...</p>
+        </div>
+      </div>
+    }>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }

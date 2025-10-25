@@ -12,23 +12,27 @@ export default function PastShowsPage() {
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
 
-  // Load data from localStorage on component mount
+  // Fetch data from API on component mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedVideos = localStorage.getItem('archivedVideos');
-      if (storedVideos) {
-        const videos = JSON.parse(storedVideos);
+    const fetchData = async () => {
+      try {
+        const response = await fetch('/api/videos');
+        const videos = await response.json();
         setPastShows(videos);
         
-        // Extract unique months
-        const months = [...new Set(videos.map(video => video.month))].sort((a, b) => {
+        // Extract unique months - handle cases where month might be undefined
+        const months = [...new Set(videos.map((video: any) => video.month).filter(Boolean))].sort((a, b) => {
           const dateA = new Date(a);
           const dateB = new Date(b);
           return dateB.getTime() - dateA.getTime();
         });
         setUniqueMonths(months);
+      } catch (error) {
+        console.error('Error fetching archived videos:', error);
       }
-    }
+    };
+    
+    fetchData();
   }, []);
 
   // Handle video selection
@@ -91,7 +95,7 @@ export default function PastShowsPage() {
         >
           <div className="flex items-center gap-4 mb-6">
             <Calendar className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-bold text-white bg-slate-900/80 px-4 py-2 rounded-lg">Filter by Month</h2>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white bg-white/80 dark:bg-slate-900/80 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">Filter by Month</h2>
           </div>
           
           <div className="flex flex-wrap gap-3">
@@ -100,19 +104,19 @@ export default function PastShowsPage() {
               className={`px-6 py-3 rounded-full font-medium transition-colors ${
                 selectedMonth === 'All'
                   ? 'bg-primary text-white'
-                  : 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600'
+                  : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600'
               }`}
             >
               All
             </button>
-            {uniqueMonths.map((month) => (
+            {uniqueMonths.map((month, index) => (
               <button
-                key={month}
+                key={month || `month-${index}`}
                 onClick={() => setSelectedMonth(month)}
                 className={`px-6 py-3 rounded-full font-medium transition-colors ${
                   selectedMonth === month
                     ? 'bg-primary text-white'
-                    : 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600'
+                    : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600'
                 }`}
               >
                 {month}
@@ -125,17 +129,17 @@ export default function PastShowsPage() {
         <div className="space-y-12">
           {Object.entries(groupedShows).map(([customTitle, shows], groupIndex) => (
             <motion.section
-              key={customTitle}
+              key={customTitle || `group-${groupIndex}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: groupIndex * 0.1 }}
             >
-              <h3 className="text-2xl font-bold text-white mb-6 bg-slate-900/80 px-4 py-2 rounded-lg">{customTitle}</h3>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 bg-white/80 dark:bg-slate-900/80 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">{customTitle}</h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {shows.map((show, index) => (
                   <motion.div
-                    key={show.id}
+                    key={show.id || `show-${groupIndex}-${index}`}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: (groupIndex * 0.1) + (index * 0.05) }}
@@ -163,10 +167,10 @@ export default function PastShowsPage() {
                     </div>
                     
                     <div>
-                      <h4 className="font-semibold text-white group-hover:text-primary transition-colors mb-2 bg-slate-900/80 px-3 py-2 rounded-lg">
+                      <h4 className="font-semibold text-slate-900 dark:text-white group-hover:text-primary transition-colors mb-2 bg-white/80 dark:bg-slate-900/80 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
                         {show.title}
                       </h4>
-                      <div className="flex items-center gap-2 text-sm text-slate-300 bg-slate-800/80 px-3 py-2 rounded-lg">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
                         <Calendar className="h-4 w-4" />
                         {new Date(show.uploadDate).toLocaleDateString('en-US', {
                           year: 'numeric',
@@ -191,8 +195,8 @@ export default function PastShowsPage() {
             className="text-center py-12"
           >
             <Calendar className="h-16 w-16 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-600 mb-2">No shows found</h3>
-            <p className="text-slate-500">Try selecting a different month or check back later for new content.</p>
+            <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-400 mb-2">No shows found</h3>
+            <p className="text-slate-500 dark:text-slate-500">Try selecting a different month or check back later for new content.</p>
           </motion.div>
         )}
       </div>

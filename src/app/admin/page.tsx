@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Eye, EyeOff, LogIn } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useHydrationFix } from '@/hooks/useHydrationFix';
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -12,6 +13,9 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Fix hydration issues caused by browser extensions
+  useHydrationFix();
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -40,7 +44,7 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/10 to-blue-600/10 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary/10 to-blue-600/10 flex items-center justify-center p-4 admin-panel">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

@@ -1,23 +1,25 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #f6f7f8;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #101c22;
-    --foreground: #ededed;
-  }
-}
-
+/* Paper texture background */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  background-image: 
+    radial-gradient(circle at 25px 25px, rgba(0,0,0,0.02) 2px, transparent 0),
+    radial-gradient(circle at 75px 75px, rgba(0,0,0,0.02) 2px, transparent 0);
+  background-size: 100px 100px;
+  background-color: #fafafa;
+  background-attachment: fixed;
 }
 
+.dark body {
+  background-image: 
+    radial-gradient(circle at 25px 25px, rgba(255,255,255,0.02) 2px, transparent 0),
+    radial-gradient(circle at 75px 75px, rgba(255,255,255,0.02) 2px, transparent 0);
+  background-color: #0f1419;
+}
+
+/* Custom scrollbar styles */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -25,4 +27,189 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Hide browser extension attributes that cause hydration issues */
+[bis_skin_checked],
+[data-bis_skin_checked],
+[bis_skin_checked_style],
+[data-bis_skin_checked_style] {
+  /* This won't prevent the attribute from being added, but it helps with styling */
+  opacity: 1 !important;
+}
+
+/* Force removal of extension attributes using CSS */
+[bis_skin_checked]::before,
+[data-bis_skin_checked]::before {
+  content: none !important;
+}
+
+/* Fix text selection and input text color issues */
+::selection {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+::-moz-selection {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+/* Fix input text color globally */
+input, textarea, select {
+  color: #1f2937 !important;
+  background-color: white !important;
+  border: 1px solid #d1d5db !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Fix modal z-index and positioning */
+.modal {
+  z-index: 9999 !important;
+  position: fixed !important;
+}
+
+/* Ensure modal overlay is above everything */
+.fixed.inset-0 {
+  z-index: 9998 !important;
+}
+
+/* Fix modal content positioning */
+.modal .bg-white {
+  z-index: 10000 !important;
+  position: relative !important;
+}
+
+/* Navigation backdrop blur styles - More specific targeting */
+header[class*="sticky"] {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  background-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.dark header[class*="sticky"] {
+  background: rgba(15, 23, 42, 0.7) !important;
+  background-color: rgba(15, 23, 42, 0.7) !important;
+}
+
+/* Force backdrop blur on all headers */
+header {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+/* Target navigation header specifically */
+header[data-nav="true"] {
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  z-index: 50 !important;
+}
+
+.dark header[data-nav="true"] {
+  background: rgba(15, 23, 42, 0.9) !important;
+  background-color: rgba(15, 23, 42, 0.9) !important;
+}
+
+/* Ensure modal backdrop blocks interaction with background content */
+.modal-backdrop {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9998 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Fix any overlapping content issues */
+.modal-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem !important;
+}
+
+/* Ensure modal content is clickable and interactive */
+.modal-content {
+  position: relative !important;
+  z-index: 10000 !important;
+  background-color: white !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  max-width: 28rem !important;
+  width: 100% !important;
+}
+
+/* Fix text selection in specific admin areas */
+.admin-panel ::selection {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+.admin-panel input, .admin-panel textarea, .admin-panel select {
+  color: #1f2937 !important;
+}
+
+/* Fix specific input styling in admin panel */
+.admin-panel input[type="text"],
+.admin-panel input[type="email"],
+.admin-panel input[type="password"],
+.admin-panel input[type="url"],
+.admin-panel textarea {
+  color: #1f2937 !important;
+  background-color: white !important;
+}
+
+.admin-panel input[type="text"]::placeholder,
+.admin-panel input[type="email"]::placeholder,
+.admin-panel input[type="password"]::placeholder,
+.admin-panel input[type="url"]::placeholder,
+.admin-panel textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Fix modal input styling */
+.admin-panel .modal input,
+.admin-panel .modal textarea {
+  color: #1f2937 !important;
+}
+
+/* Ensure proper contrast for selected sidebar items */
+.sidebar-item.selected {
+  background-color: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+
+.sidebar-item.selected:hover {
+  background-color: #e5e7eb !important;
+  color: #1f2937 !important;
+}
+
+/* Fix any white text on light backgrounds */
+.admin-panel .text-white {
+  color: #1f2937 !important;
+}
+
+/* Ensure form elements have proper contrast */
+.admin-panel form input,
+.admin-panel form textarea,
+.admin-panel form select {
+  color: #1f2937 !important;
 }
