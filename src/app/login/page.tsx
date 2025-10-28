@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -92,8 +92,8 @@ export default function LoginPage() {
               {mode === 'signin' ? 'Sign In' : 'Create Account'}
             </h1>
             <p className="text-slate-600">
-              {mode === 'signin' 
-                ? 'Welcome back to Scope Media' 
+              {mode === 'signin'
+                ? 'Welcome back to Scope Media'
                 : 'Join Scope Media today'
               }
             </p>
@@ -184,7 +184,7 @@ export default function LoginPage() {
               {loading && (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               )}
-              {loading 
+              {loading
                 ? (mode === 'signin' ? 'Signing In...' : 'Creating Account...')
                 : (mode === 'signin' ? 'Sign In' : 'Create Account')
               }
@@ -196,8 +196,8 @@ export default function LoginPage() {
               onClick={switchMode}
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
-              {mode === 'signin' 
-                ? "Don't have an account? Sign up" 
+              {mode === 'signin'
+                ? "Don't have an account? Sign up"
                 : "Already have an account? Sign in"
               }
             </button>

@@ -11,7 +11,9 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: any }>;
+  signUpWithPhone: (phone: string, password: string, fullName?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signInWithGoogle: () => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: any }>;
 }
@@ -173,6 +175,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signUpWithPhone = async (phone: string, password: string, fullName?: string) => {
+    if (!supabase) {
+      return { error: { message: 'Supabase not configured' } };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        phone,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     if (!supabase) {
       return { error: { message: 'Supabase not configured' } };
@@ -182,6 +206,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
+      });
+
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    if (!supabase) {
+      return { error: { message: 'Supabase not configured' } };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
       return { error };
@@ -224,7 +267,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     loading,
     signUp,
+    signUpWithPhone,
     signIn,
+    signInWithGoogle,
     signOut,
     updateProfile,
   };

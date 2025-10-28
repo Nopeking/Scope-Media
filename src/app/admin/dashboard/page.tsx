@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Play, Pause, Upload, Users, Eye, Settings } from 'lucide-react';
+import { Plus, Edit, Trash2, Play, Pause, Upload, Users, Eye, Settings, Archive } from 'lucide-react';
 import { LiveStream, ArchivedVideo } from '@/types';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -188,13 +188,10 @@ function AdminDashboardContent() {
     try {
       if (modalType === 'stream') {
         const newStream = {
-          id: Date.now().toString(),
           title: formData.title,
           url: formData.url,
           thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
-          status: 'live',
-          viewers: Math.floor(Math.random() * 1000) + 100,
-          date: new Date().toLocaleDateString()
+          status: 'active'
         };
         
         const response = await fetch('/api/streams', {
@@ -202,23 +199,21 @@ function AdminDashboardContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newStream)
         });
-        
+
         if (response.ok) {
-          setLiveStreams((prev: LiveStream[]) => [newStream, ...prev]);
+          const createdStream = await response.json();
+          setLiveStreams((prev: LiveStream[]) => [createdStream, ...prev]);
           console.log('✅ Stream added to UI');
         } else {
           throw new Error('Failed to add stream');
         }
       } else if (modalType === 'video') {
         const newVideo = {
-          id: Date.now().toString(),
           title: formData.title,
           url: formData.url,
           thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
           duration: '00:00', // Placeholder, ideally fetched from YouTube API
-          uploadDate: new Date().toLocaleDateString(),
-          customTitle: formData.customTitle,
-          month: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+          category: formData.customTitle
         };
         
         const response = await fetch('/api/videos', {
@@ -226,9 +221,10 @@ function AdminDashboardContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newVideo)
         });
-        
+
         if (response.ok) {
-          setArchivedVideos((prev: ArchivedVideo[]) => [newVideo, ...prev]);
+          const createdVideo = await response.json();
+          setArchivedVideos((prev: ArchivedVideo[]) => [createdVideo, ...prev]);
           console.log('✅ Video added to UI');
         } else {
           throw new Error('Failed to add video');
@@ -268,16 +264,68 @@ function AdminDashboardContent() {
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
+  // Function to move stream to past shows
+  const handleMoveStreamToPastShows = async (stream: any) => {
+    try {
+      if (!confirm(`Move "${stream.title}" to Past Shows?`)) {
+        return;
+      }
+
+      console.log(`📦 Moving stream to past shows:`, stream.title);
+
+      // Create archived video from stream data
+      const newVideo = {
+        title: stream.title,
+        url: stream.url,
+        thumbnail: stream.thumbnail,
+        duration: '00:00',
+        category: customTitles.length > 0 ? customTitles[0] : 'Archived Streams'
+      };
+
+      // Add to videos
+      const videoResponse = await fetch('/api/videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newVideo)
+      });
+
+      if (!videoResponse.ok) {
+        throw new Error('Failed to create archived video');
+      }
+
+      const createdVideo = await videoResponse.json();
+
+      // Delete from streams
+      const streamResponse = await fetch(`/api/streams?id=${stream.id}`, {
+        method: 'DELETE'
+      });
+
+      if (!streamResponse.ok) {
+        throw new Error('Failed to delete stream');
+      }
+
+      // Update UI
+      setLiveStreams((prev: LiveStream[]) => prev.filter(item => item.id !== stream.id));
+      setArchivedVideos((prev: ArchivedVideo[]) => [createdVideo, ...prev]);
+
+      console.log('✅ Stream moved to past shows successfully');
+      alert(`"${stream.title}" has been moved to Past Shows!`);
+    } catch (error: any) {
+      console.error('❌ Error moving stream:', error);
+      alert(`Failed to move stream: ${error.message}\n\nCheck console for details.`);
+    }
+  };
+
   // Function to delete content
   const handleDeleteContent = async (id: string, type: 'stream' | 'video' | 'title') => {
     try {
       console.log(`🗑️ Attempting to delete ${type}:`, id);
-      
+
       if (type === 'stream') {
         const response = await fetch(`/api/streams?id=${id}`, {
           method: 'DELETE'
         });
-        
+
         if (response.ok) {
           setLiveStreams((prev: LiveStream[]) => prev.filter(item => item.id !== id));
           console.log('✅ Stream deleted from UI');
@@ -289,7 +337,7 @@ function AdminDashboardContent() {
         const response = await fetch(`/api/videos?id=${id}`, {
           method: 'DELETE'
         });
-        
+
         if (response.ok) {
           setArchivedVideos((prev: ArchivedVideo[]) => prev.filter(item => item.id !== id));
           console.log('✅ Video deleted from UI');
@@ -301,7 +349,7 @@ function AdminDashboardContent() {
         const response = await fetch(`/api/titles?title=${encodeURIComponent(id)}`, {
           method: 'DELETE'
         });
-        
+
         if (response.ok) {
           setCustomTitles((prev: string[]) => prev.filter(title => title !== id));
           console.log('✅ Title deleted from UI');
@@ -505,10 +553,17 @@ function AdminDashboardContent() {
                                 <p className="text-xs text-slate-500 mt-1 truncate">{stream.url}</p>
                               </div>
                               <div className="flex flex-col gap-2 flex-shrink-0">
+                                <button
+                                  onClick={() => handleMoveStreamToPastShows(stream)}
+                                  className="text-green-600 hover:text-green-700 p-1"
+                                  title="Move to Past Shows"
+                                >
+                                  <Archive className="h-4 w-4" />
+                                </button>
                                 <button className="text-blue-500 hover:text-blue-700 p-1">
                                   <Edit className="h-4 w-4" />
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => handleDeleteContent(stream.id, 'stream')}
                                   className="text-red-600 hover:text-red-500 p-1"
                                 >
@@ -571,10 +626,17 @@ function AdminDashboardContent() {
                             </td>
                               <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                               <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleMoveStreamToPastShows(stream)}
+                                  className="text-green-600 hover:text-green-700"
+                                  title="Move to Past Shows"
+                                >
+                                  <Archive className="h-4 w-4" />
+                                </button>
                                 <button className="text-blue-500 hover:text-blue-700">
                                   <Edit className="h-4 w-4" />
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => handleDeleteContent(stream.id, 'stream')}
                                   className="text-red-600 hover:text-red-500"
                                 >

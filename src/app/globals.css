@@ -213,3 +213,98 @@ header[data-nav="true"] {
 .admin-panel form select {
   color: #1f2937 !important;
 }
+
+/* Media Protection - Prevent image/video source inspection */
+img, video, iframe {
+  pointer-events: auto !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  -webkit-user-drag: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+/* Prevent dragging on all images */
+img {
+  draggable: false !important;
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+}
+
+/* Disable context menu on images and videos */
+img::selection,
+video::selection {
+  background: transparent !important;
+}
+
+/* Prevent selection on media containers */
+.video-container,
+.image-container,
+[class*="thumbnail"],
+[class*="hero"] {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* Hide YouTube branding and links in embedded player */
+iframe[src*="youtube.com"] .ytp-impression-link,
+iframe[src*="youtube-nocookie.com"] .ytp-impression-link,
+.ytp-impression-link,
+.ytp-watermark,
+.ytp-youtube-button,
+.ytp-title-link,
+.ytp-show-cards-title,
+a[href*="youtube.com/watch"],
+.ytp-cards-teaser,
+.ytp-ce-element {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Disable right-click on YouTube cued thumbnail overlay */
+.ytp-cued-thumbnail-overlay,
+.ytp-cued-thumbnail-overlay-image,
+.ytp-large-play-button {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  -webkit-user-drag: none !important;
+  pointer-events: auto !important;
+}
+
+/* Additional YouTube player element hiding */
+.ytp-pause-overlay,
+.ytp-scroll-min,
+.ytp-suggested-action {
+  display: none !important;
+}
+
+/* Prevent iframe inspection by making it harder to select */
+iframe {
+  pointer-events: auto !important;
+  position: relative !important;
+}
+
+/* Cover YouTube logo area with transparent overlay */
+.player-wrapper {
+  position: relative !important;
+}
+
+.player-wrapper::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 80px !important;
+  height: 50px !important;
+  z-index: 10 !important;
+  pointer-events: none !important;
+}

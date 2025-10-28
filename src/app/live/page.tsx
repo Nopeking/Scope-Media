@@ -2,13 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X } from 'lucide-react';
-import VideoPlayer from '@/components/VideoPlayer';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function LivePage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [liveStreams, setLiveStreams] = useState<any[]>([]);
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
-  const [showVideoModal, setShowVideoModal] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login?redirect=/live');
+    }
+  }, [user, loading, router]);
 
   // Fetch data from API on component mount
   useEffect(() => {
@@ -21,24 +28,58 @@ export default function LivePage() {
         console.error('Error fetching live streams:', error);
       }
     };
-    
+
     fetchData();
   }, []);
 
-  // Handle video selection
-  const handleVideoClick = (stream: any) => {
-    setSelectedVideo(stream);
-    setShowVideoModal(true);
+  // Extract YouTube video ID from URL
+  const extractYouTubeId = (url: string) => {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=)([^&\n?#]+)/,
+      /(?:youtu\.be\/)([^&\n?#]+)/,
+      /(?:youtube\.com\/embed\/)([^&\n?#]+)/,
+      /(?:youtube\.com\/live\/)([^&\n?#]+)/,
+      /(?:v=|v\/|embed\/)([^&\n?#]+)/
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) return match[1];
+    }
+    return null;
   };
+
+  // Handle video selection - navigate to player page
+  const handleVideoClick = (stream: any) => {
+    const videoId = extractYouTubeId(stream.url);
+    const params = new URLSearchParams({
+      videoId: videoId || stream.url,
+      title: stream.title
+    });
+    router.push(`/player?${params.toString()}`);
+  };
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center">
+        <div className="text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="w-full">
       {/* Hero Section */}
       <section className="relative min-h-[400px] w-full overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: 'linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 40%), url("https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3")'
+            backgroundImage: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.5)), url("/live-hero-card.webp")'
           }}
         />
         <div className="container mx-auto px-4 py-16 sm:px-6 lg:px-8 relative z-10">
@@ -48,11 +89,11 @@ export default function LivePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
-              <h1 className="text-4xl font-bold text-white md:text-6xl mb-6">
+              <h1 className="text-4xl font-bold text-white md:text-6xl mb-6 drop-shadow-lg">
                 Live Streams
               </h1>
-              <p className="text-xl text-slate-200 max-w-2xl">
-                Watch live events and streams happening right now. Experience real-time content 
+              <p className="text-xl text-slate-200 max-w-2xl drop-shadow-md">
+                Watch live events and streams happening right now. Experience real-time content
                 with our premium streaming quality.
               </p>
             </motion.div>
@@ -67,7 +108,7 @@ export default function LivePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <h2 className="text-3xl font-bold text-slate-800 mb-8">Currently Live</h2>
+          <h2 className="text-3xl font-bold text-white dark:text-white mb-8">Currently Live</h2>
           
           {liveStreams.length === 0 ? (
             <motion.div
@@ -84,80 +125,63 @@ export default function LivePage() {
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">No Live Streams</h2>
                 <p className="text-slate-700">
-                  There are currently no live streams available. 
+                  There are currently no live streams available.
                   Check back later for new live content.
                 </p>
               </div>
             </motion.div>
           ) : (
-            <div className="space-y-8">
-              {liveStreams.map((stream, index) => (
-              <motion.div
-                key={stream.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                className="bg-white rounded-xl shadow-lg overflow-hidden"
-              >
-                <div className="aspect-video">
-                  <VideoPlayer
-                    url={stream.url}
-                    thumbnail={stream.thumbnail}
-                    autoplay={index === 0}
-                  />
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-2xl font-bold text-slate-800">{stream.title}</h3>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 text-red-600">
-                        <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></div>
-                        <span className="font-semibold">LIVE</span>
+            <div className="flex justify-center items-center">
+              <div className="w-full max-w-5xl space-y-12">
+                {liveStreams.map((stream, index) => (
+                  <motion.div
+                    key={stream.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: index * 0.1 }}
+                    onClick={() => handleVideoClick(stream)}
+                    onContextMenu={(e) => { e.preventDefault(); return false; }}
+                    className="mx-auto bg-slate-800 dark:bg-slate-800 rounded-3xl shadow-2xl overflow-hidden cursor-pointer transform hover:scale-[1.02] transition-all duration-300 group"
+                  >
+                    <div className="relative aspect-video overflow-hidden" onContextMenu={(e) => { e.preventDefault(); return false; }}>
+                      <img
+                        src={stream.thumbnail}
+                        alt={stream.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        draggable={false}
+                        onContextMenu={(e) => { e.preventDefault(); return false; }}
+                      />
+                      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center">
+                        <div className="w-28 h-28 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-2xl">
+                          <svg className="w-14 h-14 text-slate-800 ml-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </div>
                       </div>
-                      <div className="text-slate-600">
-                        {stream.viewers?.toLocaleString()} viewers
+                      <div className="absolute top-6 right-6 flex items-center gap-3 bg-green-600 text-white px-6 py-3 rounded-full text-xl font-bold shadow-2xl">
+                        <div className="w-4 h-4 bg-white rounded-full animate-pulse"></div>
+                        <span>LIVE</span>
                       </div>
                     </div>
-                  </div>
-                  <p className="text-slate-600">
-                    Join thousands of viewers watching this live stream right now. 
-                    Don't miss out on this exclusive content.
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+                    <div className="p-8">
+                      <h3 className="text-3xl font-bold text-white mb-4 group-hover:text-green-400 transition-colors">
+                        {stream.title}
+                      </h3>
+                      <p className="text-xl text-slate-300 flex items-center gap-2">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Click to watch now
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
             </div>
           )}
         </motion.section>
       </div>
-
-      {/* Video Modal */}
-      {showVideoModal && selectedVideo && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
-          >
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="text-xl font-bold text-slate-800">{selectedVideo.title}</h3>
-              <button
-                onClick={() => setShowVideoModal(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <div className="p-4">
-              <VideoPlayer
-                url={selectedVideo.url}
-                thumbnail={selectedVideo.thumbnail}
-                autoplay={true}
-              />
-            </div>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 }
