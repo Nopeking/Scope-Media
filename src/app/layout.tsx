@@ -15,6 +15,9 @@ const inter = Inter({
 export const metadata: Metadata = {
     title: "Scope Media",
     description: "Your one-stop destination for the best live streams and video content.",
+    icons: {
+        icon: '/favicon.ico',
+    },
 };
 
 export default function RootLayout({
@@ -89,6 +92,126 @@ export default function RootLayout({
                       });
                     });
                   }
+                })();
+              `,
+            }}
+          />
+          <Script
+            id="media-protection"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function() {
+                  // Console warning for developers
+                  console.log('%c⚠️ WARNING', 'color: red; font-size: 24px; font-weight: bold;');
+                  console.log('%cThis site is protected. Unauthorized access to media sources is prohibited.', 'color: orange; font-size: 14px;');
+                  console.log('%cAttempting to extract media files may violate copyright laws.', 'color: orange; font-size: 14px;');
+
+                  // Disable right-click on images and videos
+                  document.addEventListener('contextmenu', function(e) {
+                    if (e.target.tagName === 'IMG' || e.target.tagName === 'VIDEO' || e.target.tagName === 'IFRAME') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return false;
+                    }
+                  }, true);
+
+                  // Prevent dragging of images
+                  document.addEventListener('dragstart', function(e) {
+                    if (e.target.tagName === 'IMG') {
+                      e.preventDefault();
+                      return false;
+                    }
+                  });
+
+                  // Disable common dev tools shortcuts (F12, Ctrl+Shift+I, etc.)
+                  document.addEventListener('keydown', function(e) {
+                    // F12
+                    if (e.keyCode === 123) {
+                      e.preventDefault();
+                      return false;
+                    }
+                    // Ctrl+Shift+I (Inspect)
+                    if (e.ctrlKey && e.shiftKey && e.keyCode === 73) {
+                      e.preventDefault();
+                      return false;
+                    }
+                    // Ctrl+Shift+J (Console)
+                    if (e.ctrlKey && e.shiftKey && e.keyCode === 74) {
+                      e.preventDefault();
+                      return false;
+                    }
+                    // Ctrl+U (View Source)
+                    if (e.ctrlKey && e.keyCode === 85) {
+                      e.preventDefault();
+                      return false;
+                    }
+                    // Ctrl+Shift+C (Inspect Element)
+                    if (e.ctrlKey && e.shiftKey && e.keyCode === 67) {
+                      e.preventDefault();
+                      return false;
+                    }
+                  });
+
+                  // Detect devtools and show warning
+                  let devtoolsOpen = false;
+                  const threshold = 160;
+
+                  setInterval(function() {
+                    if (window.outerWidth - window.innerWidth > threshold ||
+                        window.outerHeight - window.innerHeight > threshold) {
+                      if (!devtoolsOpen) {
+                        devtoolsOpen = true;
+                        console.clear();
+                        console.log('%c⚠️ SECURITY ALERT', 'color: red; font-size: 30px; font-weight: bold;');
+                        console.log('%cDeveloper tools detected. Media sources are protected.', 'color: red; font-size: 16px;');
+                      }
+                    } else {
+                      devtoolsOpen = false;
+                    }
+                  }, 500);
+                })();
+              `,
+            }}
+          />
+          <Script
+            id="iframe-src-protection"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function() {
+                  // Monitor and protect iframe src attributes
+                  setInterval(function() {
+                    const iframes = document.querySelectorAll('iframe');
+                    iframes.forEach(function(iframe) {
+                      // Make iframe src harder to access
+                      try {
+                        iframe.setAttribute('data-protected', 'true');
+
+                        // Intercept getAttribute calls
+                        const originalGetAttribute = iframe.getAttribute;
+                        iframe.getAttribute = function(attr) {
+                          if (attr === 'src' || attr === 'data-src') {
+                            console.warn('⚠️ Unauthorized access to protected media source');
+                            return '';
+                          }
+                          return originalGetAttribute.call(this, attr);
+                        };
+                      } catch (e) {
+                        // Silently handle errors
+                      }
+                    });
+                  }, 1000);
+
+                  // Prevent opening links in new tabs from iframe
+                  document.addEventListener('click', function(e) {
+                    const target = e.target;
+                    if (target && target.tagName === 'A' && target.href && target.href.includes('youtube.com/watch')) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return false;
+                    }
+                  }, true);
                 })();
               `,
             }}

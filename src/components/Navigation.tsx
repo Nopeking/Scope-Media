@@ -42,11 +42,11 @@ const Navigation = () => {
       <div className="container mx-auto flex items-center justify-between whitespace-nowrap px-4 py-3 sm:px-6 lg:px-8" suppressHydrationWarning>
         <div className="flex items-center gap-2 sm:gap-8" suppressHydrationWarning>
           <Link href="/" className="flex items-center text-slate-900 dark:text-white" suppressHydrationWarning>
-            <img 
-              src="/logo.png" 
-              alt="Scope Media Logo" 
+            <img
+              src="/logo.png"
+              alt="Scope Media Logo"
               className="h-6 w-16 sm:h-8 sm:w-24 object-contain"
-              style={{ margin: 0, padding: 0, marginRight: '-2px' }}
+              style={{ margin: 0, padding: 0, marginRight: '-13px', marginBottom: '8px' }}
               suppressHydrationWarning
             />
                 <h2 className="text-lg sm:text-xl font-bold font-display">Media</h2>

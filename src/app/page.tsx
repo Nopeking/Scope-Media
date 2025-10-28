@@ -2,18 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import LiveFeatureBox from '@/components/LiveFeatureBox';
-import VideoPlayer from '@/components/VideoPlayer';
 import NoSSR from '@/components/NoSSR';
 
 export default function Home() {
   const router = useRouter();
   const [liveStreams, setLiveStreams] = useState<any[]>([]);
   const [recentVideos, setRecentVideos] = useState<any[]>([]);
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
-  const [showVideoModal, setShowVideoModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch data from API on component mount
@@ -24,10 +20,10 @@ export default function Home() {
           fetch('/api/streams'),
           fetch('/api/videos')
         ]);
-        
+
         const streams = await streamsRes.json();
         const videos = await videosRes.json();
-        
+
         setLiveStreams(streams);
         // Get the 4 most recent videos
         setRecentVideos(videos.slice(0, 4));
@@ -37,14 +33,34 @@ export default function Home() {
         setIsLoading(false);
       }
     };
-    
+
     fetchData();
   }, []);
 
-  // Handle video selection
+  // Extract YouTube video ID from URL
+  const extractYouTubeId = (url: string) => {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=)([^&\n?#]+)/,
+      /(?:youtu\.be\/)([^&\n?#]+)/,
+      /(?:youtube\.com\/embed\/)([^&\n?#]+)/,
+      /(?:youtube\.com\/live\/)([^&\n?#]+)/,
+      /(?:v=|v\/|embed\/)([^&\n?#]+)/
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) return match[1];
+    }
+    return null;
+  };
+
+  // Handle video selection - navigate to player
   const handleVideoClick = (video: any) => {
-    setSelectedVideo(video);
-    setShowVideoModal(true);
+    const videoId = extractYouTubeId(video.url);
+    const params = new URLSearchParams({
+      videoId: videoId || video.url,
+      title: video.title
+    });
+    router.push(`/player?${params.toString()}`);
   };
 
   // Handle hero button clicks
@@ -83,7 +99,7 @@ export default function Home() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: 'linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 40%), url("https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3")'
+            backgroundImage: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.5)), url("/hero-horse-jumping.jpg")'
           }}
         />
         <div className="container mx-auto px-4 py-12 sm:py-16 sm:px-6 lg:px-8 relative z-10">
@@ -93,10 +109,10 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
-                  <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight">
+                  <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight drop-shadow-lg">
                     Welcome to Scope Media
                   </h1>
-              <p className="text-lg sm:text-xl text-slate-200 max-w-2xl mb-6 sm:mb-8 leading-relaxed">
+              <p className="text-lg sm:text-xl text-slate-200 max-w-2xl mb-6 sm:mb-8 leading-relaxed drop-shadow-md">
                 Your one-stop destination for the best live streams and video content.
                 Experience premium quality streaming with our custom video player.
               </p>
@@ -170,36 +186,6 @@ export default function Home() {
               )}
             </NoSSR>
           </div>
-
-      {/* Video Modal */}
-      {showVideoModal && selectedVideo && (
-        <NoSSR>
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
-            >
-              <div className="flex items-center justify-between p-4 border-b border-slate-200">
-                <h3 className="text-xl font-bold text-slate-800">{selectedVideo.title}</h3>
-                <button
-                  onClick={() => setShowVideoModal(false)}
-                  className="text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-              <div className="p-4">
-                <VideoPlayer
-                  url={selectedVideo.url}
-                  thumbnail={selectedVideo.thumbnail}
-                  autoplay={true}
-                />
-              </div>
-            </motion.div>
-          </div>
-        </NoSSR>
-      )}
     </div>
   );
 }

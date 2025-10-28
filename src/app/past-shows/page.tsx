@@ -1,16 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, Play, X } from 'lucide-react';
-import VideoPlayer from '@/components/VideoPlayer';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function PastShowsPage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState<string>('All');
   const [pastShows, setPastShows] = useState<any[]>([]);
   const [uniqueMonths, setUniqueMonths] = useState<string[]>([]);
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
-  const [showVideoModal, setShowVideoModal] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login?redirect=/past-shows');
+    }
+  }, [user, loading, router]);
 
   // Fetch data from API on component mount
   useEffect(() => {
@@ -35,10 +43,35 @@ export default function PastShowsPage() {
     fetchData();
   }, []);
 
-  // Handle video selection
+  // Extract YouTube video ID from URL
+  const extractYouTubeId = (url: string) => {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=)([^&\n?#]+)/,
+      /(?:youtu\.be\/)([^&\n?#]+)/,
+      /(?:youtube\.com\/embed\/)([^&\n?#]+)/,
+      /(?:youtube\.com\/live\/)([^&\n?#]+)/,
+      /(?:v=|v\/|embed\/)([^&\n?#]+)/
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return null;
+  };
+
+  // Handle video selection - Navigate to player page
   const handleVideoClick = (show: any) => {
-    setSelectedVideo(show);
-    setShowVideoModal(true);
+    // Extract video ID to keep URL short and avoid 431 errors
+    const videoId = extractYouTubeId(show.url);
+    const params = new URLSearchParams({
+      videoId: videoId || show.url,  // fallback to full URL if extraction fails
+      title: show.title
+      // Note: thumbnail removed to avoid HTTP 431 errors (base64 thumbnails are too large)
+    });
+    router.push(`/player?${params.toString()}`);
   };
 
   // Filter shows based on selected month
@@ -55,14 +88,28 @@ export default function PastShowsPage() {
     return acc;
   }, {} as Record<string, typeof pastShows>);
 
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center">
+        <div className="text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="w-full">
       {/* Hero Section */}
       <section className="relative min-h-[300px] w-full overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: 'linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 40%), url("https://images.unsplash.com/photo-1515187029135-18ee286d815b?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3")'
+            backgroundImage: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.5)), url("/past-show-hero-card.webp")'
           }}
         />
         <div className="container mx-auto px-4 py-16 sm:px-6 lg:px-8 relative z-10">
@@ -72,11 +119,11 @@ export default function PastShowsPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
-              <h1 className="text-4xl font-bold text-white md:text-6xl mb-6">
+              <h1 className="text-4xl font-bold text-white md:text-6xl mb-6 drop-shadow-lg">
                 Past Shows
               </h1>
-              <p className="text-xl text-slate-200 max-w-2xl">
-                Explore our archive of past live streams and video content. 
+              <p className="text-xl text-slate-200 max-w-2xl drop-shadow-md">
+                Explore our archive of past live streams and video content.
                 Watch at your own pace with our premium video library.
               </p>
             </motion.div>
@@ -147,9 +194,11 @@ export default function PastShowsPage() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => handleVideoClick(show)}
+                    onContextMenu={(e) => { e.preventDefault(); return false; }}
                   >
                     <div className="relative w-full overflow-hidden rounded-lg aspect-video bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
-                         style={{ backgroundImage: `url(${show.thumbnail})` }}>
+                         style={{ backgroundImage: `url(${show.thumbnail})` }}
+                         onContextMenu={(e) => { e.preventDefault(); return false; }}>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                       
                       {/* Removed duration badge as requested */}
@@ -201,33 +250,6 @@ export default function PastShowsPage() {
         )}
       </div>
 
-      {/* Video Modal */}
-      {showVideoModal && selectedVideo && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
-          >
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="text-xl font-bold text-slate-800">{selectedVideo.title}</h3>
-              <button
-                onClick={() => setShowVideoModal(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <div className="p-4">
-              <VideoPlayer
-                url={selectedVideo.url}
-                thumbnail={selectedVideo.thumbnail}
-                autoplay={true}
-              />
-            </div>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 }
