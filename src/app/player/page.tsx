@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Maximize2, Minimize, AlertCircle, ExternalLink } from 'lucide-react';
 import Scoreboard from '@/components/Scoreboard';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function PlayerPage() {
+function PlayerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -294,5 +294,17 @@ export default function PlayerPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PlayerPage() {
+  return (
+    <Suspense fallback={
+      <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    }>
+      <PlayerContent />
+    </Suspense>
   );
 }

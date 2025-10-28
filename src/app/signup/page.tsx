@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, Lock, Mail, AlertCircle, User } from 'lucide-react';
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { signUp, user, loading } = useAuth();
@@ -334,5 +334,17 @@ export default function SignupPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-xl">Loading...</div>
+      </div>
+    }>
+      <SignupForm />
+    </Suspense>
   );
 }
