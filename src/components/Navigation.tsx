@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, PlayCircle, Film, Bell, User, Library, LogOut, Menu, X } from 'lucide-react';
+import { Home, PlayCircle, Film, Bell, User, Library, LogOut, Menu, X, UserCheck } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState } from 'react';
@@ -11,6 +11,7 @@ const Navigation = () => {
   const pathname = usePathname();
   const { user, userProfile, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
@@ -95,23 +96,74 @@ const Navigation = () => {
           </button>
           
           {user ? (
-            <div className="flex items-center gap-2">
-              <div className="hidden sm:block text-sm">
-                <div className="font-medium text-slate-800 dark:text-white">
-                  {userProfile?.full_name || 'User'}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  {userProfile?.subscription_plan || 'free'}
-                </div>
-              </div>
+            <div className="relative">
               <button
-                onClick={signOut}
-                className="h-8 w-8 sm:h-10 sm:w-10 aspect-square rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center hover:from-red-400 hover:to-red-600 transition-all"
-                title="Sign Out"
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg p-2 transition-colors"
                 suppressHydrationWarning
               >
-                <LogOut className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                <div className="hidden sm:block text-sm text-right">
+                  <div className="font-medium text-slate-800 dark:text-white">
+                    {userProfile?.full_name || 'User'}
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    {userProfile?.subscription_plan || 'free'}
+                  </div>
+                </div>
+                <div className="h-8 w-8 sm:h-10 sm:w-10 aspect-square rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                </div>
               </button>
+
+              {/* Profile Dropdown Menu */}
+              {showProfileMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowProfileMenu(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50">
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+                      <div className="font-medium text-slate-800 dark:text-white">
+                        {userProfile?.full_name || user?.email || 'User'}
+                      </div>
+                      <div className="text-sm text-slate-500 dark:text-slate-400">
+                        {user?.email}
+                      </div>
+                    </div>
+                    <div className="py-2">
+                      <Link
+                        href="/my-library"
+                        onClick={() => setShowProfileMenu(false)}
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <Library className="h-4 w-4" />
+                        My Library
+                      </Link>
+                      <Link
+                        href="/profile/link-rider"
+                        onClick={() => setShowProfileMenu(false)}
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        Link Rider Profile
+                      </Link>
+                    </div>
+                    <div className="border-t border-slate-200 dark:border-slate-700 py-2">
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          signOut();
+                        }}
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors w-full"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <Link 

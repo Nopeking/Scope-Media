@@ -76,12 +76,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       console.log('Fetching user profile for:', userId);
-      
-      const { data, error } = await supabase
+
+      // Add a timeout to prevent infinite loading
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+      );
+
+      const fetchPromise = supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single();
+
+      const { data, error } = await Promise.race([fetchPromise, timeout]) as any;
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
         console.error('Error fetching user profile:', error);
@@ -91,31 +98,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hint: error.hint,
           code: error.code
         });
+        setLoading(false); // Ensure loading stops even on error
       } else if (data) {
         console.log('User profile found:', data);
         setUserProfile(data);
+        setLoading(false);
       } else {
         console.log('No user profile found, creating new one...');
         // Create profile if it doesn't exist
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user) {
           await createUserProfile(userData.user);
+        } else {
+          setLoading(false);
         }
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
-    } finally {
-      setLoading(false);
+      setLoading(false); // Always stop loading on error
     }
   };
 
   const createUserProfile = async (user: User) => {
     try {
       console.log('Creating user profile for:', user.id, user.email);
-      
+
       // Check if user is confirmed
       if (!user.email_confirmed_at && !user.phone_confirmed_at) {
         console.log('User not confirmed yet, cannot create profile');
+        setLoading(false);
         return;
       }
 
@@ -138,18 +149,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hint: error.hint,
           code: error.code
         });
-        
+
         // If it's a foreign key constraint error, the user might not be in auth.users yet
         if (error.code === '23503') {
           console.log('User not found in auth.users, retrying in 2 seconds...');
           setTimeout(() => createUserProfile(user), 2000);
+        } else {
+          setLoading(false); // Stop loading on non-retryable errors
         }
       } else {
         console.log('User profile created successfully:', data);
         setUserProfile(data);
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error in createUserProfile:', error);
+      setLoading(false); // Always stop loading on error
     }
   };
 
