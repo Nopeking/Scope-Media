@@ -93,12 +93,14 @@ export async function POST(request: NextRequest) {
     const startlistData = entries.map((entry: any) => ({
       class_id: entry.class_id,
       rider_name: entry.rider_name,
-      rider_id: entry.rider_id,
+      rider_id: entry.rider_id || null,
+      fei_id: entry.fei_id || null,
+      license: entry.license || null,
       horse_name: entry.horse_name,
       horse_id: entry.horse_id || null,
       team_name: entry.team_name || null,
+      club_name: entry.club_name || null,
       start_order: entry.start_order,
-      bib_number: entry.bib_number || null,
       updated_at: new Date().toISOString()
     }));
 

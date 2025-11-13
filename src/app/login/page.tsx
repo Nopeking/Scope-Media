@@ -20,6 +20,10 @@ export default function LoginPage() {
   const { signIn, signUp } = useAuth();
   const router = useRouter();
 
+  // Get redirectTo from URL params
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const redirectTo = searchParams?.get('redirectTo') || '/';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -32,10 +36,11 @@ export default function LoginPage() {
         if (error) {
           setError(error.message || 'Failed to sign in');
         } else {
-          setMessage('Successfully signed in!');
+          setMessage('Successfully signed in! Redirecting...');
+          // Force page reload to ensure middleware runs with new auth state
           setTimeout(() => {
-            router.push('/');
-          }, 1000);
+            window.location.href = redirectTo;
+          }, 500);
         }
       } else {
         const { error } = await signUp(email, password, fullName);

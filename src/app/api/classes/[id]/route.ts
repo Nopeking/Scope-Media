@@ -101,7 +101,8 @@ export async function PUT(
       max_points,
       number_of_rounds,
       linked_stream_id,
-      status
+      status,
+      scoring_password
     } = body;
 
     // Validate class_rule if provided
@@ -131,6 +132,7 @@ export async function PUT(
     if (number_of_rounds !== undefined) updateData.number_of_rounds = number_of_rounds;
     if (linked_stream_id !== undefined) updateData.linked_stream_id = linked_stream_id;
     if (status !== undefined) updateData.status = status;
+    if (scoring_password !== undefined) updateData.scoring_password = scoring_password;
 
     const { data: classItem, error } = await supabaseAdmin
       .from('classes')

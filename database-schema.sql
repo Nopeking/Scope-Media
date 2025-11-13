@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   full_name TEXT,
   avatar_url TEXT,
   subscription_plan TEXT DEFAULT 'free' CHECK (subscription_plan IN ('free', 'premium', 'enterprise')),
+  is_admin BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -484,6 +485,7 @@ CREATE TABLE IF NOT EXISTS classes (
   number_of_rounds INTEGER DEFAULT 1,
   linked_stream_id UUID REFERENCES streams(id),
   status TEXT DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'in_progress', 'completed', 'cancelled')),
+  scoring_password TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -493,13 +495,14 @@ CREATE TABLE IF NOT EXISTS startlist (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   class_id UUID REFERENCES classes(id) ON DELETE CASCADE NOT NULL,
   rider_name TEXT NOT NULL,
-  rider_id TEXT NOT NULL,
+  rider_id TEXT,
+  fei_id TEXT,
+  license TEXT,
   horse_name TEXT NOT NULL,
   horse_id TEXT,
   team_name TEXT,
   club_name TEXT,
   start_order INTEGER NOT NULL,
-  bib_number TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

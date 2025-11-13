@@ -106,7 +106,8 @@ export async function POST(request: NextRequest) {
       max_points,
       number_of_rounds,
       linked_stream_id,
-      status
+      status,
+      scoring_password
     } = body;
 
     // Validate required fields
@@ -142,6 +143,7 @@ export async function POST(request: NextRequest) {
       number_of_rounds: number_of_rounds || 1,
       linked_stream_id: linked_stream_id || null,
       status: status || 'upcoming',
+      scoring_password: scoring_password || null,
       updated_at: new Date().toISOString()
     };
 

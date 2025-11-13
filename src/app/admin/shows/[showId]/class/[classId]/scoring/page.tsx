@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Save, Trophy, Clock, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, Trophy, Clock, AlertCircle, Share2, Copy, Check } from 'lucide-react';
 
 interface StartlistEntry {
   id: string;
@@ -13,7 +13,6 @@ interface StartlistEntry {
   team_name: string | null;
   club_name: string | null;
   start_order: number;
-  bib_number: string | null;
 }
 
 interface Score {
@@ -65,6 +64,8 @@ export default function ScoringPage({
   const [scores, setScores] = useState<Record<string, Score>>({});
   const [currentRound, setCurrentRound] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [resultsLinkCopied, setResultsLinkCopied] = useState(false);
 
   // Check if this is a two-phase class
   const isTwoPhase = classInfo?.class_rule === 'two_phases' || classInfo?.class_rule === 'special_two_phases';
@@ -380,6 +381,30 @@ export default function ScoringPage({
     }));
   };
 
+  const handleCopyLink = async () => {
+    const publicUrl = `${window.location.origin}/scoring/live/${classId}`;
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 3000);
+    } catch (error) {
+      console.error('Failed to copy link:', error);
+      alert('Failed to copy link to clipboard');
+    }
+  };
+
+  const handleCopyResultsLink = async () => {
+    const resultsUrl = `${window.location.origin}/results/${classId}`;
+    try {
+      await navigator.clipboard.writeText(resultsUrl);
+      setResultsLinkCopied(true);
+      setTimeout(() => setResultsLinkCopied(false), 3000);
+    } catch (error) {
+      console.error('Failed to copy results link:', error);
+      alert('Failed to copy results link to clipboard');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     const option = STATUS_OPTIONS.find((opt) => opt.value === status);
     return option?.color || 'gray';
@@ -524,28 +549,78 @@ export default function ScoringPage({
             </div>
           </div>
 
-          {classInfo && classInfo.number_of_rounds > 1 && !isTwoPhase && (
-            <div className="flex flex-col items-end gap-2">
-              <p className="text-sm text-gray-400">Switch Round:</p>
-              <div className="flex gap-2">
-                {Array.from({ length: classInfo.number_of_rounds }, (_, i) => i + 1).map(
-                  (round) => (
-                    <button
-                      key={round}
-                      onClick={() => setCurrentRound(round)}
-                      className={`px-6 py-3 rounded-lg font-bold text-lg transition shadow-lg ${
-                        currentRound === round
-                          ? 'bg-purple-600 ring-4 ring-purple-400/50'
-                          : 'bg-gray-700 hover:bg-gray-600'
-                      }`}
-                    >
-                      Round {round}
-                    </button>
-                  )
+          <div className="flex flex-col items-end gap-3">
+            {/* Copy Links Section */}
+            <div className="flex gap-2">
+              {/* Share Public Scoring Entry Link */}
+              <button
+                onClick={handleCopyLink}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                  linkCopied
+                    ? 'bg-green-600 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {linkCopied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-4 h-4" />
+                    Scoring Entry Link
+                  </>
                 )}
-              </div>
+              </button>
+
+              {/* Copy Results Display Link (for streams) */}
+              <button
+                onClick={handleCopyResultsLink}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                  resultsLinkCopied
+                    ? 'bg-green-600 text-white'
+                    : 'bg-orange-600 hover:bg-orange-700 text-white'
+                }`}
+              >
+                {resultsLinkCopied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Trophy className="w-4 h-4" />
+                    Results Link (Stream)
+                  </>
+                )}
+              </button>
             </div>
-          )}
+
+            {/* Round Switcher for multi-round classes */}
+            {classInfo && classInfo.number_of_rounds > 1 && !isTwoPhase && (
+              <div className="flex flex-col items-end gap-2">
+                <p className="text-sm text-gray-400">Switch Round:</p>
+                <div className="flex gap-2">
+                  {Array.from({ length: classInfo.number_of_rounds }, (_, i) => i + 1).map(
+                    (round) => (
+                      <button
+                        key={round}
+                        onClick={() => setCurrentRound(round)}
+                        className={`px-6 py-3 rounded-lg font-bold text-lg transition shadow-lg ${
+                          currentRound === round
+                            ? 'bg-purple-600 ring-4 ring-purple-400/50'
+                            : 'bg-gray-700 hover:bg-gray-600'
+                        }`}
+                      >
+                        Round {round}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Info Banner */}

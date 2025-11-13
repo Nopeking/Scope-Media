@@ -55,6 +55,7 @@ export default function ShowsManagementPage() {
     time_allowed: '',
     time_allowed_round2: '',
     optimum_time: '',
+    scoring_password: '',
   });
 
   useEffect(() => {
@@ -218,6 +219,7 @@ export default function ShowsManagementPage() {
       time_allowed: '',
       time_allowed_round2: '',
       optimum_time: '',
+      scoring_password: '',
     });
   };
 
@@ -249,6 +251,7 @@ export default function ShowsManagementPage() {
       time_allowed: classItem.time_allowed?.toString() || '',
       time_allowed_round2: classItem.time_allowed_round2?.toString() || '',
       optimum_time: classItem.optimum_time?.toString() || '',
+      scoring_password: (classItem as any).scoring_password || '',
     });
     setClassModal(true);
   };
@@ -796,6 +799,18 @@ export default function ShowsManagementPage() {
                         />
                       </div>
                     )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Public Scoring Password (Optional)</label>
+                    <input
+                      type="text"
+                      value={classFormData.scoring_password}
+                      onChange={(e) => setClassFormData({ ...classFormData, scoring_password: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter password for public scoring access"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Set a password to protect the public scoring page for spectators</p>
                   </div>
                 </div>
 

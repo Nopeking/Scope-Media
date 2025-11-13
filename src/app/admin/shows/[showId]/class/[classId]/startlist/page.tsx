@@ -13,8 +13,8 @@ interface StartlistEntry {
   horse_name: string;
   horse_id: string | null;
   team_name: string | null;
+  club_name: string | null;
   start_order: number;
-  bib_number: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -50,8 +50,8 @@ export default function StartlistPage({
     horse_name: '',
     horse_id: '',
     team_name: '',
+    club_name: '',
     start_order: '',
-    bib_number: '',
   });
 
   useEffect(() => {
@@ -162,8 +162,8 @@ export default function StartlistPage({
       horse_name: entry.horse_name,
       horse_id: entry.horse_id || '',
       team_name: entry.team_name || '',
+      club_name: entry.club_name || '',
       start_order: entry.start_order.toString(),
-      bib_number: entry.bib_number || '',
     });
     setShowAddForm(true);
   };
@@ -175,8 +175,8 @@ export default function StartlistPage({
       horse_name: '',
       horse_id: '',
       team_name: '',
+      club_name: '',
       start_order: '',
-      bib_number: '',
     });
   };
 
@@ -200,13 +200,18 @@ export default function StartlistPage({
         // Map Excel columns to our format
         const entries = jsonData.map((row: any, index: number) => ({
           class_id: classId,
-          rider_name: row['Rider Name'] || row['rider_name'] || '',
-          rider_id: row['Rider ID'] || row['rider_id'] || '',
-          horse_name: row['Horse Name'] || row['horse_name'] || '',
-          horse_id: row['Horse ID'] || row['horse_id'] || null,
-          team_name: row['Team Name'] || row['team_name'] || null,
-          start_order: row['Start Order'] || row['start_order'] || index + 1,
-          bib_number: row['Bib Number'] || row['bib_number'] || null,
+          rider_name: row['Rider Name'] || row['rider_name'] || row['RIDER NAME'] || '',
+          // FEI ID mapping
+          fei_id: row['FEI ID'] || row['fei_id'] || row['Rider FEI ID'] || row['rider_fei_id'] || null,
+          // License/Rider ID mapping
+          license: row['Rider ID'] || row['rider_id'] || row['RIDER ID'] || row['License'] || row['license'] || null,
+          // Legacy rider_id field (for backwards compatibility)
+          rider_id: row['Rider ID'] || row['rider_id'] || row['FEI ID'] || row['fei_id'] || null,
+          horse_name: row['Horse Name'] || row['horse_name'] || row['HORSE NAME'] || '',
+          horse_id: row['Horse ID'] || row['horse_id'] || row['HORSE ID'] || null,
+          team_name: row['Team Name'] || row['team_name'] || row['TEAM NAME'] || null,
+          club_name: row['Club Name'] || row['club_name'] || row['CLUB NAME'] || null,
+          start_order: row['S.No'] || row['s.no'] || row['S.NO'] || row['Start Order'] || row['start_order'] || index + 1,
         }));
 
         // Bulk insert
@@ -232,9 +237,9 @@ export default function StartlistPage({
   };
 
   const downloadTemplate = () => {
-    const template = `Rider Name,Rider ID,Horse Name,Horse ID,Team Name,Start Order,Bib Number
-John Smith,FEI12345,Thunder,H12345,Team A,1,1
-Jane Doe,FEI67890,Lightning,H67890,Team A,2,2`;
+    const template = `S.No,Rider Name,FEI ID,Rider ID,Horse Name,Horse ID,Team Name,Club Name
+1,John Smith,10204650,LIC123,Thunder,H12345,Team A,Dubai Equestrian Club
+2,Jane Doe,10305751,LIC456,Lightning,H67890,Team A,Abu Dhabi Riding Club`;
 
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -394,7 +399,21 @@ Jane Doe,FEI67890,Lightning,H67890,Team A,2,2`;
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Start Order *
+                    Club Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.club_name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, club_name: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Start Order (S.No) *
                   </label>
                   <input
                     type="number"
@@ -403,20 +422,6 @@ Jane Doe,FEI67890,Lightning,H67890,Team A,2,2`;
                       setFormData({ ...formData, start_order: e.target.value })
                     }
                     required
-                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Bib Number
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.bib_number}
-                    onChange={(e) =>
-                      setFormData({ ...formData, bib_number: e.target.value })
-                    }
                     className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500"
                   />
                 </div>
@@ -458,12 +463,12 @@ Jane Doe,FEI67890,Lightning,H67890,Team A,2,2`;
             <table className="w-full">
               <thead className="bg-white/10">
                 <tr>
-                  <th className="px-6 py-3 text-left">Start Order</th>
-                  <th className="px-6 py-3 text-left">Bib</th>
+                  <th className="px-6 py-3 text-left">S.No</th>
                   <th className="px-6 py-3 text-left">Rider Name</th>
                   <th className="px-6 py-3 text-left">Rider ID</th>
                   <th className="px-6 py-3 text-left">Horse Name</th>
                   <th className="px-6 py-3 text-left">Team</th>
+                  <th className="px-6 py-3 text-left">Club</th>
                   <th className="px-6 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -474,11 +479,11 @@ Jane Doe,FEI67890,Lightning,H67890,Team A,2,2`;
                     className="border-t border-white/10 hover:bg-white/5"
                   >
                     <td className="px-6 py-4">{entry.start_order}</td>
-                    <td className="px-6 py-4">{entry.bib_number || '-'}</td>
                     <td className="px-6 py-4">{entry.rider_name}</td>
                     <td className="px-6 py-4">{entry.rider_id}</td>
                     <td className="px-6 py-4">{entry.horse_name}</td>
                     <td className="px-6 py-4">{entry.team_name || '-'}</td>
+                    <td className="px-6 py-4">{entry.club_name || '-'}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button
