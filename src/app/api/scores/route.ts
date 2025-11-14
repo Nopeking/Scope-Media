@@ -42,8 +42,7 @@ export async function GET(request: NextRequest) {
           horse_name,
           rider_id,
           team_name,
-          start_order,
-          bib_number
+          start_order
         )
       `)
       .order('rank', { ascending: true });

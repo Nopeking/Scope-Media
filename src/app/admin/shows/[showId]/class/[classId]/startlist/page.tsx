@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Upload, Download, Plus, Trash2, Edit, ArrowLeft, Save } from 'lucide-react';
+import { Upload, Download, Plus, Trash2, Edit, ArrowLeft, Save, Hash } from 'lucide-react';
 
 interface StartlistEntry {
   id: string;
@@ -197,6 +197,8 @@ export default function StartlistPage({
         const sheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(sheet);
 
+        console.log('📊 Raw Excel data:', jsonData);
+
         // Map Excel columns to our format
         const entries = jsonData.map((row: any, index: number) => ({
           class_id: classId,
@@ -214,22 +216,57 @@ export default function StartlistPage({
           start_order: row['S.No'] || row['s.no'] || row['S.NO'] || row['Start Order'] || row['start_order'] || index + 1,
         }));
 
+        console.log('📤 Mapped entries to send:', entries);
+
+        // Check if startlist already exists
+        if (startlist.length > 0) {
+          const confirmReplace = confirm(
+            `This class already has ${startlist.length} entries in the startlist.\n\n` +
+            `Uploading a new Excel file will:\n` +
+            `• DELETE all existing entries\n` +
+            `• REPLACE with ${entries.length} new entries from Excel\n` +
+            `• RENUMBER start orders sequentially (1, 2, 3...)\n\n` +
+            `Do you want to continue?`
+          );
+
+          if (!confirmReplace) {
+            return;
+          }
+
+          // Delete all existing entries for this class
+          await fetch(`/api/startlist?class_id=${classId}`, {
+            method: 'DELETE',
+          });
+        }
+
+        // Sort by start_order and renumber sequentially to avoid gaps
+        const sortedEntries = entries
+          .sort((a, b) => a.start_order - b.start_order)
+          .map((entry, index) => ({
+            ...entry,
+            start_order: index + 1, // Sequential numbering: 1, 2, 3, 4...
+          }));
+
+        console.log('📋 Renumbered entries (sequential):', sortedEntries);
+
         // Bulk insert
         const response = await fetch('/api/startlist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(entries),
+          body: JSON.stringify(sortedEntries),
         });
 
         if (response.ok) {
           await fetchStartlist();
-          alert('Excel file uploaded successfully!');
+          alert(`✅ Excel file uploaded successfully!\n${sortedEntries.length} entries added with sequential numbering.`);
         } else {
-          alert('Error uploading Excel file');
+          const errorData = await response.json();
+          console.error('Upload error:', errorData);
+          alert(`Error uploading Excel file: ${errorData.error || 'Unknown error'}`);
         }
       } catch (error) {
         console.error('Error processing Excel file:', error);
-        alert('Error processing Excel file');
+        alert(`Error processing Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     };
 
@@ -247,6 +284,58 @@ export default function StartlistPage({
     a.href = url;
     a.download = 'startlist-template.csv';
     a.click();
+  };
+
+  const handleRenumberStartlist = async () => {
+    if (startlist.length === 0) {
+      alert('No entries to renumber');
+      return;
+    }
+
+    const confirmRenumber = confirm(
+      `This will renumber all ${startlist.length} entries sequentially (1, 2, 3...).\n\n` +
+      `Current order will be preserved, but gaps will be removed.\n\n` +
+      `Do you want to continue?`
+    );
+
+    if (!confirmRenumber) return;
+
+    try {
+      // Delete all existing entries
+      await fetch(`/api/startlist?class_id=${classId}`, {
+        method: 'DELETE',
+      });
+
+      // Renumber and re-insert
+      const renumberedEntries = startlist
+        .sort((a, b) => a.start_order - b.start_order)
+        .map((entry, index) => ({
+          class_id: classId,
+          rider_name: entry.rider_name,
+          rider_id: entry.rider_id,
+          horse_name: entry.horse_name,
+          horse_id: entry.horse_id,
+          team_name: entry.team_name,
+          club_name: entry.club_name,
+          start_order: index + 1,
+        }));
+
+      const response = await fetch('/api/startlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(renumberedEntries),
+      });
+
+      if (response.ok) {
+        await fetchStartlist();
+        alert('✅ Startlist renumbered successfully!');
+      } else {
+        alert('Error renumbering startlist');
+      }
+    } catch (error) {
+      console.error('Error renumbering startlist:', error);
+      alert('Error renumbering startlist');
+    }
   };
 
   return (
@@ -290,6 +379,16 @@ export default function StartlistPage({
                 className="hidden"
               />
             </label>
+
+            <button
+              onClick={handleRenumberStartlist}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={startlist.length === 0}
+              title={startlist.length === 0 ? 'No entries to renumber' : 'Renumber all entries sequentially'}
+            >
+              <Hash className="w-5 h-5" />
+              Renumber
+            </button>
 
             <button
               onClick={() => {

@@ -67,6 +67,11 @@ export default function PublicScoringPage() {
   const [timeAllowed, setTimeAllowed] = useState<string>('');
   const [timeAllowedRound2, setTimeAllowedRound2] = useState<string>('');
 
+  // Check if this is a two-phase class
+  const isTwoPhase = classData?.class_rule === 'two_phases' || classData?.class_rule === 'special_two_phases';
+  const isRegularTwoPhase = classData?.class_rule === 'two_phases';
+  const isSpecialTwoPhase = classData?.class_rule === 'special_two_phases';
+
   // Scoring form state for each rider
   const [scoringData, setScoringData] = useState<Record<string, {
     time_taken: string;
@@ -74,6 +79,10 @@ export default function PublicScoringPage() {
     time_faults: string;
     status: string;
     notes: string;
+    // Phase 2 data (for two-phase classes)
+    time_taken_phase2: string;
+    jumping_faults_phase2: string;
+    time_faults_phase2: string;
   }>>({});
 
   useEffect(() => {
@@ -81,12 +90,12 @@ export default function PublicScoringPage() {
   }, [classId]);
 
   useEffect(() => {
-    if (authenticated) {
+    if (authenticated && classData) {
       fetchScoringData();
       const interval = setInterval(fetchScoringData, 10000); // Refresh every 10 seconds
       return () => clearInterval(interval);
     }
-  }, [authenticated]);
+  }, [authenticated, classData]);
 
   const fetchClassData = async () => {
     try {
@@ -123,23 +132,45 @@ export default function PublicScoringPage() {
         setStartlist(startlistData);
       }
 
-      // Fetch scores for round 1
-      const scoresResponse = await fetch(`/api/scores?class_id=${classId}&round_number=1`);
-      if (scoresResponse.ok) {
-        const scoresData = await scoresResponse.json();
+      // For two-phase classes, fetch both rounds
+      if (isTwoPhase) {
+        // Fetch Phase 1 (round 1)
+        const response1 = await fetch(`/api/scores?class_id=${classId}&round_number=1`);
+        // Fetch Phase 2 (round 2)
+        const response2 = await fetch(`/api/scores?class_id=${classId}&round_number=2`);
+
         const scoresMap: Record<string, Score> = {};
         const newScoringData: Record<string, any> = {};
 
-        scoresData.forEach((score: Score) => {
-          scoresMap[score.startlist_id] = score;
-          newScoringData[score.startlist_id] = {
-            time_taken: score.time_taken?.toString() || '',
-            jumping_faults: score.jumping_faults.toString(),
-            time_faults: score.time_faults.toString(),
-            status: score.status,
-            notes: score.notes || '',
-          };
-        });
+        // Process Phase 1 data
+        if (response1.ok) {
+          const data1 = await response1.json();
+          data1.forEach((score: Score) => {
+            scoresMap[score.startlist_id] = score;
+            newScoringData[score.startlist_id] = {
+              time_taken: score.time_taken != null ? score.time_taken.toString() : '',
+              jumping_faults: score.jumping_faults != null ? score.jumping_faults.toString() : '0',
+              time_faults: score.time_faults != null ? score.time_faults.toString() : '0',
+              status: score.status || 'completed',
+              notes: score.notes != null ? score.notes : '',
+              time_taken_phase2: '',
+              jumping_faults_phase2: '0',
+              time_faults_phase2: '0',
+            };
+          });
+        }
+
+        // Process Phase 2 data
+        if (response2.ok) {
+          const data2 = await response2.json();
+          data2.forEach((score: Score) => {
+            if (newScoringData[score.startlist_id]) {
+              newScoringData[score.startlist_id].time_taken_phase2 = score.time_taken != null ? score.time_taken.toString() : '';
+              newScoringData[score.startlist_id].jumping_faults_phase2 = score.jumping_faults != null ? score.jumping_faults.toString() : '0';
+              newScoringData[score.startlist_id].time_faults_phase2 = score.time_faults != null ? score.time_faults.toString() : '0';
+            }
+          });
+        }
 
         setScores(scoresMap);
 
@@ -148,6 +179,34 @@ export default function PublicScoringPage() {
             ...prev,
             ...newScoringData,
           }));
+        }
+      } else {
+        // For non-two-phase classes, fetch round 1
+        const scoresResponse = await fetch(`/api/scores?class_id=${classId}&round_number=1`);
+        if (scoresResponse.ok) {
+          const scoresData = await scoresResponse.json();
+          const scoresMap: Record<string, Score> = {};
+          const newScoringData: Record<string, any> = {};
+
+          scoresData.forEach((score: Score) => {
+            scoresMap[score.startlist_id] = score;
+            newScoringData[score.startlist_id] = {
+              time_taken: score.time_taken != null ? score.time_taken.toString() : '',
+              jumping_faults: score.jumping_faults != null ? score.jumping_faults.toString() : '0',
+              time_faults: score.time_faults != null ? score.time_faults.toString() : '0',
+              status: score.status || 'completed',
+              notes: score.notes != null ? score.notes : '',
+            };
+          });
+
+          setScores(scoresMap);
+
+          if (Object.keys(newScoringData).length > 0) {
+            setScoringData((prev) => ({
+              ...prev,
+              ...newScoringData,
+            }));
+          }
         }
       }
     } catch (error) {
@@ -208,52 +267,117 @@ export default function PublicScoringPage() {
     if (!data) return;
 
     try {
-      const timeTaken = parseFloat(data.time_taken) || null;
-      const jumpingFaults = parseInt(data.jumping_faults) || 0;
+      if (isTwoPhase) {
+        // For two-phase classes, save both phases
+        // Phase 1
+        const timeTaken1 = parseFloat(data.time_taken) || null;
+        const jumpingFaults1 = parseInt(data.jumping_faults) || 0;
+        const timeFaults1 = classData?.time_allowed && timeTaken1
+          ? calculateTimeFaults(timeTaken1, classData.time_allowed)
+          : parseInt(data.time_faults) || 0;
+        const totalFaults1 = jumpingFaults1 + timeFaults1;
 
-      const currentTimeAllowed = classData?.time_allowed;
-      const timeFaults = currentTimeAllowed && timeTaken
-        ? calculateTimeFaults(timeTaken, currentTimeAllowed)
-        : parseInt(data.time_faults) || 0;
-      const totalFaults = jumpingFaults + timeFaults;
+        const scoreData1 = {
+          startlist_id: startlistId,
+          class_id: classId,
+          round_number: 1,
+          time_taken: timeTaken1,
+          jumping_faults: jumpingFaults1,
+          time_faults: timeFaults1,
+          total_faults: totalFaults1,
+          status: data.status,
+          notes: data.notes || null,
+        };
 
-      const scoreData = {
-        startlist_id: startlistId,
-        class_id: classId,
-        round_number: 1,
-        time_taken: timeTaken,
-        jumping_faults: jumpingFaults,
-        time_faults: timeFaults,
-        total_faults: totalFaults,
-        status: data.status,
-        notes: data.notes || null,
-      };
+        // Phase 2
+        const timeTaken2 = parseFloat(data.time_taken_phase2) || null;
+        const jumpingFaults2 = parseInt(data.jumping_faults_phase2) || 0;
+        const timeFaults2 = classData?.time_allowed_round2 && timeTaken2
+          ? calculateTimeFaults(timeTaken2, classData.time_allowed_round2)
+          : parseInt(data.time_faults_phase2) || 0;
+        const totalFaults2 = jumpingFaults2 + timeFaults2;
 
-      const existingScore = scores[startlistId];
+        const scoreData2 = {
+          startlist_id: startlistId,
+          class_id: classId,
+          round_number: 2,
+          time_taken: timeTaken2,
+          jumping_faults: jumpingFaults2,
+          time_faults: timeFaults2,
+          total_faults: totalFaults2,
+          status: data.status,
+          notes: data.notes || null,
+        };
 
-      if (existingScore) {
-        // Update existing score
-        const response = await fetch(`/api/scores?id=${existingScore.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(scoreData),
-        });
-
-        if (response.ok) {
-          await fetchScoringData();
-          alert('Score updated successfully!');
-        }
-      } else {
-        // Create new score
-        const response = await fetch('/api/scores', {
+        // Save Phase 1
+        const response1 = await fetch('/api/scores', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(scoreData),
+          body: JSON.stringify(scoreData1),
         });
 
-        if (response.ok) {
+        // Save Phase 2 if time is entered
+        if (timeTaken2 !== null) {
+          const response2 = await fetch('/api/scores', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(scoreData2),
+          });
+        }
+
+        if (response1.ok) {
           await fetchScoringData();
-          alert('Score saved successfully!');
+          alert('Two-phase score saved successfully!');
+        }
+      } else {
+        // For non-two-phase classes, save single round
+        const timeTaken = parseFloat(data.time_taken) || null;
+        const jumpingFaults = parseInt(data.jumping_faults) || 0;
+
+        const currentTimeAllowed = classData?.time_allowed;
+        const timeFaults = currentTimeAllowed && timeTaken
+          ? calculateTimeFaults(timeTaken, currentTimeAllowed)
+          : parseInt(data.time_faults) || 0;
+        const totalFaults = jumpingFaults + timeFaults;
+
+        const scoreData = {
+          startlist_id: startlistId,
+          class_id: classId,
+          round_number: 1,
+          time_taken: timeTaken,
+          jumping_faults: jumpingFaults,
+          time_faults: timeFaults,
+          total_faults: totalFaults,
+          status: data.status,
+          notes: data.notes || null,
+        };
+
+        const existingScore = scores[startlistId];
+
+        if (existingScore) {
+          // Update existing score
+          const response = await fetch(`/api/scores?id=${existingScore.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(scoreData),
+          });
+
+          if (response.ok) {
+            await fetchScoringData();
+            alert('Score updated successfully!');
+          }
+        } else {
+          // Create new score
+          const response = await fetch('/api/scores', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(scoreData),
+          });
+
+          if (response.ok) {
+            await fetchScoringData();
+            alert('Score saved successfully!');
+          }
         }
       }
     } catch (error) {
@@ -267,13 +391,26 @@ export default function PublicScoringPage() {
     field: string,
     value: string
   ) => {
-    setScoringData((prev) => ({
-      ...prev,
-      [startlistId]: {
-        ...prev[startlistId],
-        [field]: value,
-      },
-    }));
+    setScoringData((prev) => {
+      const defaultData = {
+        time_taken: '',
+        jumping_faults: '0',
+        time_faults: '0',
+        status: 'completed',
+        notes: '',
+        time_taken_phase2: '',
+        jumping_faults_phase2: '0',
+        time_faults_phase2: '0',
+      };
+      return {
+        ...prev,
+        [startlistId]: {
+          ...defaultData,
+          ...prev[startlistId],
+          [field]: value || '',
+        },
+      };
+    });
   };
 
   const getLeaderboard = () => {
@@ -364,7 +501,7 @@ export default function PublicScoringPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[95%] mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -454,10 +591,54 @@ export default function PublicScoringPage() {
         {/* Info Banner */}
         <div className="bg-blue-600/20 border border-blue-600/50 rounded-lg p-4 mb-6 flex items-center gap-3">
           <AlertCircle className="w-5 h-5" />
-          <p>
-            Enter times in seconds (e.g., 65.50). Time faults will be calculated automatically
-            if Time Allowed is set. Click Save after entering each rider's score.
-          </p>
+          <div className="w-full">
+            {isRegularTwoPhase ? (
+              <div>
+                <p className="mb-2 text-lg font-bold text-green-300">
+                  ⚡ Two-Phase Competition - ONE continuous run from A → B → C
+                </p>
+                <p className="mb-2">
+                  Enter times in seconds (e.g., 65.50). Time faults will be calculated automatically
+                  if Time Allowed is set.
+                </p>
+                <div className="mt-3 bg-yellow-500/20 border border-yellow-500/50 rounded p-3">
+                  <p className="font-bold text-yellow-300 mb-2">Two-Phase Rules:</p>
+                  <ul className="text-sm space-y-1 text-yellow-100">
+                    <li>• Phase 1 (A→B) and Phase 2 (B→C) are completed in ONE continuous run</li>
+                    <li>• <strong>If rider has faults in Phase 1, they DO NOT continue to Phase 2</strong></li>
+                    <li>• Only riders with 0 faults in Phase 1 continue to Phase 2</li>
+                    <li>• <strong>Ranking:</strong> Riders who completed Phase 2 rank FIRST (by Phase 2 time), riders with Phase 1 faults rank below them</li>
+                    <li>• <strong>Winner:</strong> Fastest Phase 2 time among riders with 0 Phase 1 faults</li>
+                  </ul>
+                </div>
+              </div>
+            ) : isSpecialTwoPhase ? (
+              <div>
+                <p className="mb-2 text-lg font-bold text-purple-300">
+                  ⚡ Special Two-Phase Competition - ONE continuous run from A → B → C
+                </p>
+                <p className="mb-2">
+                  Enter times in seconds (e.g., 65.50). Time faults will be calculated automatically
+                  if Time Allowed is set.
+                </p>
+                <div className="mt-3 bg-purple-500/20 border border-purple-500/50 rounded p-3">
+                  <p className="font-bold text-purple-300 mb-2">Special Two-Phase Rules:</p>
+                  <ul className="text-sm space-y-1 text-purple-100">
+                    <li>• Phase 1 (A→B) and Phase 2 (B→C) are completed in ONE continuous run</li>
+                    <li>• <strong>ALL riders complete BOTH phases</strong> regardless of Phase 1 faults</li>
+                    <li>• Total faults = Phase 1 faults + Phase 2 faults (combined)</li>
+                    <li>• <strong>Ranking:</strong> By total faults (lowest first), then by Phase 2 time (fastest)</li>
+                    <li>• <strong>Winner:</strong> Lowest total faults with fastest Phase 2 time</li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <p>
+                Enter times in seconds (e.g., 65.50). Time faults will be calculated automatically
+                if Time Allowed is set. Click Save after entering each rider's score.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Leaderboard */}
@@ -518,19 +699,53 @@ export default function PublicScoringPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-white/10">
-                <tr>
-                  <th className="px-4 py-3 text-left">#</th>
-                  <th className="px-4 py-3 text-left">Rider</th>
-                  <th className="px-4 py-3 text-left">Horse</th>
-                  <th className="px-4 py-3 text-left">Club</th>
-                  <th className="px-4 py-3 text-left">Time (s)</th>
-                  <th className="px-4 py-3 text-left">Jump Faults</th>
-                  <th className="px-4 py-3 text-left">Time Faults</th>
-                  <th className="px-4 py-3 text-left">Total</th>
-                  <th className="px-4 py-3 text-left">Status</th>
-                  <th className="px-4 py-3 text-left">Notes</th>
-                  <th className="px-4 py-3 text-right">Action</th>
-                </tr>
+                {isTwoPhase ? (
+                  <tr>
+                    <th className="px-2 py-2 text-left w-10">#</th>
+                    <th className="px-2 py-2 text-left w-32">Rider</th>
+                    <th className="px-2 py-2 text-left w-28">Horse</th>
+                    <th className="px-2 py-2 text-left w-24">Club</th>
+                    <th className="px-1 py-2 text-center bg-blue-600/20 text-xs" colSpan={3}>Phase 1 (A→B)</th>
+                    <th className="px-1 py-2 text-center bg-green-600/20 text-xs" colSpan={3}>
+                      Phase 2 (B→C)
+                      {isRegularTwoPhase && (
+                        <div className="text-xs font-normal text-yellow-300 mt-1">
+                          Only if 0 faults Phase 1
+                        </div>
+                      )}
+                    </th>
+                    <th className="px-2 py-2 text-left w-12">Total</th>
+                    <th className="px-2 py-2 text-left w-24">Status</th>
+                    <th className="px-2 py-2 text-left w-32">Notes</th>
+                    <th className="px-2 py-2 text-right w-20">Action</th>
+                  </tr>
+                ) : (
+                  <tr>
+                    <th className="px-2 py-2 text-left w-10">#</th>
+                    <th className="px-2 py-2 text-left w-32">Rider</th>
+                    <th className="px-2 py-2 text-left w-28">Horse</th>
+                    <th className="px-2 py-2 text-left w-24">Club</th>
+                    <th className="px-2 py-2 text-left w-20">Time (s)</th>
+                    <th className="px-2 py-2 text-left w-20">Jump</th>
+                    <th className="px-2 py-2 text-left w-20">Time F.</th>
+                    <th className="px-2 py-2 text-left w-12">Total</th>
+                    <th className="px-2 py-2 text-left w-24">Status</th>
+                    <th className="px-2 py-2 text-left w-32">Notes</th>
+                    <th className="px-2 py-2 text-right w-20">Action</th>
+                  </tr>
+                )}
+                {isTwoPhase && (
+                  <tr className="bg-white/5 text-xs">
+                    <th colSpan={4}></th>
+                    <th className="px-1 py-1 text-center bg-blue-600/10">Time (s)</th>
+                    <th className="px-1 py-1 text-center bg-blue-600/10">Jump</th>
+                    <th className="px-1 py-1 text-center bg-blue-600/10">Time F.</th>
+                    <th className="px-1 py-1 text-center bg-green-600/10">Time (s)</th>
+                    <th className="px-1 py-1 text-center bg-green-600/10">Jump</th>
+                    <th className="px-1 py-1 text-center bg-green-600/10">Time F.</th>
+                    <th colSpan={3}></th>
+                  </tr>
+                )}
               </thead>
               <tbody>
                 {startlist.map((entry) => {
@@ -540,105 +755,252 @@ export default function PublicScoringPage() {
                     time_faults: '0',
                     status: 'completed',
                     notes: '',
+                    time_taken_phase2: '',
+                    jumping_faults_phase2: '0',
+                    time_faults_phase2: '0',
                   };
-                  const data = scoringData[entry.id] ? {
+                  const existingData = scoringData[entry.id] || {};
+                  const data = {
                     ...defaultData,
-                    ...scoringData[entry.id]
-                  } : defaultData;
+                    ...existingData,
+                    // Ensure all values are strings, never null or undefined
+                    time_taken: existingData.time_taken ?? '',
+                    jumping_faults: existingData.jumping_faults ?? '0',
+                    time_faults: existingData.time_faults ?? '0',
+                    status: existingData.status ?? 'completed',
+                    notes: existingData.notes ?? '',
+                    time_taken_phase2: existingData.time_taken_phase2 ?? '',
+                    jumping_faults_phase2: existingData.jumping_faults_phase2 ?? '0',
+                    time_faults_phase2: existingData.time_faults_phase2 ?? '0',
+                  };
 
-                  const totalFaults =
-                    (parseInt(data.jumping_faults) || 0) +
-                    (parseInt(data.time_faults) || 0);
+                  if (isTwoPhase) {
+                    // Two-phase: show both phases in one row
+                    const totalFaults =
+                      (parseInt(data.jumping_faults) || 0) +
+                      (parseInt(data.time_faults) || 0) +
+                      (parseInt(data.jumping_faults_phase2) || 0) +
+                      (parseInt(data.time_faults_phase2) || 0);
 
-                  return (
-                    <tr
-                      key={entry.id}
-                      className="border-t border-white/10 hover:bg-white/5"
-                    >
-                      <td className="px-4 py-3">{entry.start_order}</td>
-                      <td className="px-4 py-3 font-medium">{entry.rider_name}</td>
-                      <td className="px-4 py-3">{entry.horse_name}</td>
-                      <td className="px-4 py-3 text-sm">{entry.club_name || '-'}</td>
+                    return (
+                      <tr
+                        key={entry.id}
+                        className="border-t border-white/10 hover:bg-white/5"
+                      >
+                        <td className="px-2 py-2">{entry.start_order}</td>
+                        <td className="px-2 py-2 font-medium text-sm truncate" title={entry.rider_name}>{entry.rider_name}</td>
+                        <td className="px-2 py-2 text-sm truncate" title={entry.horse_name}>{entry.horse_name}</td>
+                        <td className="px-2 py-2 text-sm truncate">{entry.club_name || '-'}</td>
 
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={data.time_taken}
-                          onChange={(e) =>
-                            handleInputChange(entry.id, 'time_taken', e.target.value)
-                          }
-                          className="w-24 px-2 py-1 bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
-                          placeholder="0.00"
-                        />
-                      </td>
+                        {/* Phase 1 (A→B) */}
+                        <td className="px-1 py-2 bg-blue-600/5">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={data.time_taken}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'time_taken', e.target.value)
+                            }
+                            className="w-16 px-1 py-1 text-sm bg-white/10 border border-blue-400/30 rounded focus:outline-none focus:border-blue-500"
+                            placeholder="0.00"
+                          />
+                        </td>
+                        <td className="px-1 py-2 bg-blue-600/5">
+                          <input
+                            type="number"
+                            value={data.jumping_faults}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'jumping_faults', e.target.value)
+                            }
+                            className="w-12 px-1 py-1 text-sm bg-white/10 border border-blue-400/30 rounded focus:outline-none focus:border-blue-500"
+                          />
+                        </td>
+                        <td className="px-1 py-2 bg-blue-600/5">
+                          <input
+                            type="number"
+                            value={data.time_faults}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'time_faults', e.target.value)
+                            }
+                            className="w-12 px-1 py-1 text-sm bg-white/10 border border-blue-400/30 rounded focus:outline-none focus:border-blue-500"
+                            disabled={!!classData?.time_allowed}
+                          />
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          value={data.jumping_faults}
-                          onChange={(e) =>
-                            handleInputChange(entry.id, 'jumping_faults', e.target.value)
-                          }
-                          className="w-20 px-2 py-1 bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
-                        />
-                      </td>
+                        {/* Phase 2 (B→C) */}
+                        <td className="px-1 py-2 bg-green-600/5">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={data.time_taken_phase2}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'time_taken_phase2', e.target.value)
+                            }
+                            className="w-16 px-1 py-1 text-sm bg-white/10 border border-green-400/30 rounded focus:outline-none focus:border-green-500"
+                            placeholder="0.00"
+                          />
+                        </td>
+                        <td className="px-1 py-2 bg-green-600/5">
+                          <input
+                            type="number"
+                            value={data.jumping_faults_phase2}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'jumping_faults_phase2', e.target.value)
+                            }
+                            className="w-12 px-1 py-1 text-sm bg-white/10 border border-green-400/30 rounded focus:outline-none focus:border-green-500"
+                          />
+                        </td>
+                        <td className="px-1 py-2 bg-green-600/5">
+                          <input
+                            type="number"
+                            value={data.time_faults_phase2}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'time_faults_phase2', e.target.value)
+                            }
+                            className="w-12 px-1 py-1 text-sm bg-white/10 border border-green-400/30 rounded focus:outline-none focus:border-green-500"
+                            disabled={!!classData?.time_allowed_round2}
+                          />
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          value={data.time_faults}
-                          onChange={(e) =>
-                            handleInputChange(entry.id, 'time_faults', e.target.value)
-                          }
-                          className="w-20 px-2 py-1 bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
-                          disabled={!!classData?.time_allowed}
-                        />
-                      </td>
+                        <td className="px-2 py-2 font-bold text-yellow-400 text-sm">
+                          {totalFaults}
+                        </td>
 
-                      <td className="px-4 py-3 font-bold text-yellow-400">
-                        {totalFaults}
-                      </td>
+                        <td className="px-2 py-2">
+                          <select
+                            value={data.status}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'status', e.target.value)
+                            }
+                            className="px-1 py-1 text-xs bg-white/10 border border-white/20 rounded focus:outline-none w-full"
+                          >
+                            {STATUS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value} className="bg-gray-900">
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <select
-                          value={data.status}
-                          onChange={(e) =>
-                            handleInputChange(entry.id, 'status', e.target.value)
-                          }
-                          className="px-2 py-1 bg-white/10 border border-white/20 rounded focus:outline-none text-sm"
-                        >
-                          {STATUS_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value} className="bg-gray-900">
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
+                        <td className="px-2 py-2">
+                          <input
+                            type="text"
+                            value={data.notes}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'notes', e.target.value)
+                            }
+                            className="w-full px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                            placeholder="Notes..."
+                          />
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <input
-                          type="text"
-                          value={data.notes}
-                          onChange={(e) =>
-                            handleInputChange(entry.id, 'notes', e.target.value)
-                          }
-                          className="w-32 px-2 py-1 bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
-                          placeholder="Notes..."
-                        />
-                      </td>
+                        <td className="px-2 py-2 text-right">
+                          <button
+                            onClick={() => handleSaveScore(entry.id)}
+                            className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-500 rounded transition text-xs"
+                          >
+                            <Save className="w-3 h-3" />
+                            Save
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  } else {
+                    // Non-two-phase: single row
+                    const totalFaults =
+                      (parseInt(data.jumping_faults) || 0) +
+                      (parseInt(data.time_faults) || 0);
 
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleSaveScore(entry.id)}
-                          className="flex items-center gap-2 px-3 py-1 bg-green-600 hover:bg-green-500 rounded transition text-sm ml-auto"
-                        >
-                          <Save className="w-4 h-4" />
-                          Save
-                        </button>
-                      </td>
-                    </tr>
-                  );
+                    return (
+                      <tr
+                        key={entry.id}
+                        className="border-t border-white/10 hover:bg-white/5"
+                      >
+                        <td className="px-2 py-2">{entry.start_order}</td>
+                        <td className="px-2 py-2 font-medium text-sm truncate" title={entry.rider_name}>{entry.rider_name}</td>
+                        <td className="px-2 py-2 text-sm truncate" title={entry.horse_name}>{entry.horse_name}</td>
+                        <td className="px-2 py-2 text-sm truncate">{entry.club_name || '-'}</td>
+
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={data.time_taken}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'time_taken', e.target.value)
+                            }
+                            className="w-16 px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                            placeholder="0.00"
+                          />
+                        </td>
+
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            value={data.jumping_faults}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'jumping_faults', e.target.value)
+                            }
+                            className="w-12 px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                          />
+                        </td>
+
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            value={data.time_faults}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'time_faults', e.target.value)
+                            }
+                            className="w-12 px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                            disabled={!!classData?.time_allowed}
+                          />
+                        </td>
+
+                        <td className="px-2 py-2 font-bold text-yellow-400 text-sm">
+                          {totalFaults}
+                        </td>
+
+                        <td className="px-2 py-2">
+                          <select
+                            value={data.status}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'status', e.target.value)
+                            }
+                            className="px-1 py-1 text-xs bg-white/10 border border-white/20 rounded focus:outline-none w-full"
+                          >
+                            {STATUS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value} className="bg-gray-900">
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+
+                        <td className="px-2 py-2">
+                          <input
+                            type="text"
+                            value={data.notes}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'notes', e.target.value)
+                            }
+                            className="w-full px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                            placeholder="Notes..."
+                          />
+                        </td>
+
+                        <td className="px-2 py-2 text-right">
+                          <button
+                            onClick={() => handleSaveScore(entry.id)}
+                            className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-500 rounded transition text-xs"
+                          >
+                            <Save className="w-3 h-3" />
+                            Save
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  }
                 })}
               </tbody>
             </table>

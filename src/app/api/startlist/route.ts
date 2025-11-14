@@ -79,11 +79,11 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields for all entries
     for (const entry of entries) {
-      const { class_id, rider_name, rider_id, horse_name, start_order } = entry;
+      const { class_id, rider_name, horse_name, start_order } = entry;
 
-      if (!class_id || !rider_name || !rider_id || !horse_name || start_order === undefined) {
+      if (!class_id || !rider_name || !horse_name || start_order === undefined) {
         return NextResponse.json(
-          { error: 'class_id, rider_name, rider_id, horse_name, and start_order are required for all entries' },
+          { error: 'class_id, rider_name, horse_name, and start_order are required for all entries' },
           { status: 400 }
         );
       }

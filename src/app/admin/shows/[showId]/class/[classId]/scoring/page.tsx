@@ -161,11 +161,11 @@ export default function ScoringPage({
           data1.forEach((score: Score & { startlist: StartlistEntry }) => {
             scoresMap[score.startlist_id] = score;
             newScoringData[score.startlist_id] = {
-              time_taken: score.time_taken?.toString() || '',
-              jumping_faults: score.jumping_faults.toString(),
-              time_faults: score.time_faults.toString(),
-              status: score.status,
-              notes: score.notes || '',
+              time_taken: score.time_taken != null ? score.time_taken.toString() : '',
+              jumping_faults: score.jumping_faults != null ? score.jumping_faults.toString() : '0',
+              time_faults: score.time_faults != null ? score.time_faults.toString() : '0',
+              status: score.status || 'completed',
+              notes: score.notes != null ? score.notes : '',
               time_taken_phase2: '',
               jumping_faults_phase2: '0',
               time_faults_phase2: '0',
@@ -175,9 +175,9 @@ export default function ScoringPage({
           // Process Phase 2 data
           data2.forEach((score: Score & { startlist: StartlistEntry }) => {
             if (newScoringData[score.startlist_id]) {
-              newScoringData[score.startlist_id].time_taken_phase2 = score.time_taken?.toString() || '';
-              newScoringData[score.startlist_id].jumping_faults_phase2 = score.jumping_faults.toString();
-              newScoringData[score.startlist_id].time_faults_phase2 = score.time_faults.toString();
+              newScoringData[score.startlist_id].time_taken_phase2 = score.time_taken != null ? score.time_taken.toString() : '';
+              newScoringData[score.startlist_id].jumping_faults_phase2 = score.jumping_faults != null ? score.jumping_faults.toString() : '0';
+              newScoringData[score.startlist_id].time_faults_phase2 = score.time_faults != null ? score.time_faults.toString() : '0';
             }
           });
 
@@ -206,11 +206,11 @@ export default function ScoringPage({
 
             // Populate form with existing score data
             newScoringData[score.startlist_id] = {
-              time_taken: score.time_taken?.toString() || '',
-              jumping_faults: score.jumping_faults.toString(),
-              time_faults: score.time_faults.toString(),
-              status: score.status,
-              notes: score.notes || '',
+              time_taken: score.time_taken != null ? score.time_taken.toString() : '',
+              jumping_faults: score.jumping_faults != null ? score.jumping_faults.toString() : '0',
+              time_faults: score.time_faults != null ? score.time_faults.toString() : '0',
+              status: score.status || 'completed',
+              notes: score.notes != null ? score.notes : '',
             };
           });
 
@@ -372,13 +372,26 @@ export default function ScoringPage({
     field: string,
     value: string
   ) => {
-    setScoringData((prev) => ({
-      ...prev,
-      [startlistId]: {
-        ...prev[startlistId],
-        [field]: value,
-      },
-    }));
+    setScoringData((prev) => {
+      const defaultData = {
+        time_taken: '',
+        jumping_faults: '0',
+        time_faults: '0',
+        status: 'completed',
+        notes: '',
+        time_taken_phase2: '',
+        jumping_faults_phase2: '0',
+        time_faults_phase2: '0',
+      };
+      return {
+        ...prev,
+        [startlistId]: {
+          ...defaultData,
+          ...prev[startlistId],
+          [field]: value || '',
+        },
+      };
+    });
   };
 
   const handleCopyLink = async () => {
@@ -706,13 +719,12 @@ export default function ScoringPage({
                 <thead className="bg-white/10">
                   {isTwoPhase ? (
                     <tr>
-                      <th className="px-4 py-3 text-left">#</th>
-                      <th className="px-4 py-3 text-left">Bib</th>
-                      <th className="px-4 py-3 text-left">Rider</th>
-                      <th className="px-4 py-3 text-left">Horse</th>
-                      <th className="px-4 py-3 text-left">Team</th>
-                      <th className="px-2 py-3 text-center bg-blue-600/20" colSpan={3}>Phase 1 (A→B)</th>
-                      <th className="px-2 py-3 text-center bg-green-600/20" colSpan={3}>
+                      <th className="px-2 py-2 text-left w-10">#</th>
+                      <th className="px-2 py-2 text-left w-32">Rider</th>
+                      <th className="px-2 py-2 text-left w-28">Horse</th>
+                      <th className="px-2 py-2 text-left w-24">Team</th>
+                      <th className="px-1 py-2 text-center bg-blue-600/20 text-xs" colSpan={3}>Phase 1 (A→B)</th>
+                      <th className="px-1 py-2 text-center bg-green-600/20 text-xs" colSpan={3}>
                         Phase 2 (B→C)
                         {isRegularTwoPhase && (
                           <div className="text-xs font-normal text-yellow-300 mt-1">
@@ -720,36 +732,35 @@ export default function ScoringPage({
                           </div>
                         )}
                       </th>
-                      <th className="px-4 py-3 text-left">Total</th>
-                      <th className="px-4 py-3 text-left">Status</th>
-                      <th className="px-4 py-3 text-left">Notes</th>
-                      <th className="px-4 py-3 text-right">Action</th>
+                      <th className="px-2 py-2 text-left w-12">Total</th>
+                      <th className="px-2 py-2 text-left w-24">Status</th>
+                      <th className="px-2 py-2 text-left w-32">Notes</th>
+                      <th className="px-2 py-2 text-right w-20">Action</th>
                     </tr>
                   ) : (
                     <tr>
-                      <th className="px-4 py-3 text-left">#</th>
-                      <th className="px-4 py-3 text-left">Bib</th>
-                      <th className="px-4 py-3 text-left">Rider</th>
-                      <th className="px-4 py-3 text-left">Horse</th>
-                      <th className="px-4 py-3 text-left">Team</th>
-                      <th className="px-4 py-3 text-left">Time (s)</th>
-                      <th className="px-4 py-3 text-left">Jump Faults</th>
-                      <th className="px-4 py-3 text-left">Time Faults</th>
-                      <th className="px-4 py-3 text-left">Total</th>
-                      <th className="px-4 py-3 text-left">Status</th>
-                      <th className="px-4 py-3 text-left">Notes</th>
-                      <th className="px-4 py-3 text-right">Action</th>
+                      <th className="px-2 py-2 text-left w-10">#</th>
+                      <th className="px-2 py-2 text-left w-32">Rider</th>
+                      <th className="px-2 py-2 text-left w-28">Horse</th>
+                      <th className="px-2 py-2 text-left w-24">Team</th>
+                      <th className="px-2 py-2 text-left w-20">Time (s)</th>
+                      <th className="px-2 py-2 text-left w-20">Jump</th>
+                      <th className="px-2 py-2 text-left w-20">Time F.</th>
+                      <th className="px-2 py-2 text-left w-12">Total</th>
+                      <th className="px-2 py-2 text-left w-24">Status</th>
+                      <th className="px-2 py-2 text-left w-32">Notes</th>
+                      <th className="px-2 py-2 text-right w-20">Action</th>
                     </tr>
                   )}
                   {isTwoPhase && (
                     <tr className="bg-white/5 text-xs">
-                      <th colSpan={5}></th>
-                      <th className="px-2 py-2 text-center bg-blue-600/10">Time (s)</th>
-                      <th className="px-2 py-2 text-center bg-blue-600/10">Jump</th>
-                      <th className="px-2 py-2 text-center bg-blue-600/10">Time F.</th>
-                      <th className="px-2 py-2 text-center bg-green-600/10">Time (s)</th>
-                      <th className="px-2 py-2 text-center bg-green-600/10">Jump</th>
-                      <th className="px-2 py-2 text-center bg-green-600/10">Time F.</th>
+                      <th colSpan={4}></th>
+                      <th className="px-1 py-1 text-center bg-blue-600/10">Time (s)</th>
+                      <th className="px-1 py-1 text-center bg-blue-600/10">Jump</th>
+                      <th className="px-1 py-1 text-center bg-blue-600/10">Time F.</th>
+                      <th className="px-1 py-1 text-center bg-green-600/10">Time (s)</th>
+                      <th className="px-1 py-1 text-center bg-green-600/10">Jump</th>
+                      <th className="px-1 py-1 text-center bg-green-600/10">Time F.</th>
                       <th colSpan={3}></th>
                     </tr>
                   )}
@@ -766,10 +777,20 @@ export default function ScoringPage({
                       jumping_faults_phase2: '0',
                       time_faults_phase2: '0',
                     };
-                    const data = scoringData[entry.id] ? {
+                    const existingData = scoringData[entry.id] || {};
+                    const data = {
                       ...defaultData,
-                      ...scoringData[entry.id]
-                    } : defaultData;
+                      ...existingData,
+                      // Ensure all values are strings, never null or undefined
+                      time_taken: existingData.time_taken ?? '',
+                      jumping_faults: existingData.jumping_faults ?? '0',
+                      time_faults: existingData.time_faults ?? '0',
+                      status: existingData.status ?? 'completed',
+                      notes: existingData.notes ?? '',
+                      time_taken_phase2: existingData.time_taken_phase2 ?? '',
+                      jumping_faults_phase2: existingData.jumping_faults_phase2 ?? '0',
+                      time_faults_phase2: existingData.time_faults_phase2 ?? '0',
+                    };
 
                     if (isTwoPhase) {
                       // Two-phase: show both phases in one row
@@ -784,14 +805,13 @@ export default function ScoringPage({
                           key={entry.id}
                           className="border-t border-white/10 hover:bg-white/5"
                         >
-                          <td className="px-4 py-3">{entry.start_order}</td>
-                          <td className="px-4 py-3">{entry.bib_number || '-'}</td>
-                          <td className="px-4 py-3 font-medium">{entry.rider_name}</td>
-                          <td className="px-4 py-3">{entry.horse_name}</td>
-                          <td className="px-4 py-3">{entry.team_name || '-'}</td>
+                          <td className="px-2 py-2">{entry.start_order}</td>
+                          <td className="px-2 py-2 font-medium text-sm truncate" title={entry.rider_name}>{entry.rider_name}</td>
+                          <td className="px-2 py-2 text-sm truncate" title={entry.horse_name}>{entry.horse_name}</td>
+                          <td className="px-2 py-2 text-sm truncate">{entry.team_name || '-'}</td>
 
                           {/* Phase 1 (A→B) */}
-                          <td className="px-2 py-3 bg-blue-600/5">
+                          <td className="px-1 py-2 bg-blue-600/5">
                             <input
                               type="number"
                               step="0.01"
@@ -799,34 +819,34 @@ export default function ScoringPage({
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'time_taken', e.target.value)
                               }
-                              className="w-20 px-2 py-1 bg-white/10 border border-blue-400/30 rounded focus:outline-none focus:border-blue-500"
+                              className="w-16 px-1 py-1 text-sm bg-white/10 border border-blue-400/30 rounded focus:outline-none focus:border-blue-500"
                               placeholder="0.00"
                             />
                           </td>
-                          <td className="px-2 py-3 bg-blue-600/5">
+                          <td className="px-1 py-2 bg-blue-600/5">
                             <input
                               type="number"
                               value={data.jumping_faults}
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'jumping_faults', e.target.value)
                               }
-                              className="w-16 px-2 py-1 bg-white/10 border border-blue-400/30 rounded focus:outline-none focus:border-blue-500"
+                              className="w-12 px-1 py-1 text-sm bg-white/10 border border-blue-400/30 rounded focus:outline-none focus:border-blue-500"
                             />
                           </td>
-                          <td className="px-2 py-3 bg-blue-600/5">
+                          <td className="px-1 py-2 bg-blue-600/5">
                             <input
                               type="number"
                               value={data.time_faults}
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'time_faults', e.target.value)
                               }
-                              className="w-16 px-2 py-1 bg-white/10 border border-blue-400/30 rounded focus:outline-none focus:border-blue-500"
+                              className="w-12 px-1 py-1 text-sm bg-white/10 border border-blue-400/30 rounded focus:outline-none focus:border-blue-500"
                               disabled={!!classInfo?.time_allowed}
                             />
                           </td>
 
                           {/* Phase 2 (B→C) */}
-                          <td className="px-2 py-3 bg-green-600/5">
+                          <td className="px-1 py-2 bg-green-600/5">
                             <input
                               type="number"
                               step="0.01"
@@ -834,47 +854,47 @@ export default function ScoringPage({
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'time_taken_phase2', e.target.value)
                               }
-                              className="w-20 px-2 py-1 bg-white/10 border border-green-400/30 rounded focus:outline-none focus:border-green-500"
+                              className="w-16 px-1 py-1 text-sm bg-white/10 border border-green-400/30 rounded focus:outline-none focus:border-green-500"
                               placeholder="0.00"
                             />
                           </td>
-                          <td className="px-2 py-3 bg-green-600/5">
+                          <td className="px-1 py-2 bg-green-600/5">
                             <input
                               type="number"
                               value={data.jumping_faults_phase2}
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'jumping_faults_phase2', e.target.value)
                               }
-                              className="w-16 px-2 py-1 bg-white/10 border border-green-400/30 rounded focus:outline-none focus:border-green-500"
+                              className="w-12 px-1 py-1 text-sm bg-white/10 border border-green-400/30 rounded focus:outline-none focus:border-green-500"
                             />
                           </td>
-                          <td className="px-2 py-3 bg-green-600/5">
+                          <td className="px-1 py-2 bg-green-600/5">
                             <input
                               type="number"
                               value={data.time_faults_phase2}
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'time_faults_phase2', e.target.value)
                               }
-                              className="w-16 px-2 py-1 bg-white/10 border border-green-400/30 rounded focus:outline-none focus:border-green-500"
+                              className="w-12 px-1 py-1 text-sm bg-white/10 border border-green-400/30 rounded focus:outline-none focus:border-green-500"
                               disabled={!!classInfo?.time_allowed_round2}
                             />
                           </td>
 
-                          <td className="px-4 py-3 font-bold text-yellow-400">
+                          <td className="px-2 py-2 font-bold text-yellow-400 text-sm">
                             {totalFaults}
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-2">
                             <select
                               value={data.status}
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'status', e.target.value)
                               }
-                              className={`px-2 py-1 bg-${getStatusColor(
+                              className={`px-1 py-1 text-xs bg-${getStatusColor(
                                 data.status
                               )}-600/30 border border-${getStatusColor(
                                 data.status
-                              )}-600/50 rounded focus:outline-none`}
+                              )}-600/50 rounded focus:outline-none w-full`}
                             >
                               {STATUS_OPTIONS.map((option) => (
                                 <option key={option.value} value={option.value}>
@@ -884,24 +904,24 @@ export default function ScoringPage({
                             </select>
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-2">
                             <input
                               type="text"
                               value={data.notes}
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'notes', e.target.value)
                               }
-                              className="w-32 px-2 py-1 bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                              className="w-full px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
                               placeholder="Notes..."
                             />
                           </td>
 
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-2 py-2 text-right">
                             <button
                               onClick={() => handleSaveScore(entry.id)}
-                              className="flex items-center gap-2 px-3 py-1 bg-green-600 hover:bg-green-500 rounded transition text-sm"
+                              className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-500 rounded transition text-xs"
                             >
-                              <Save className="w-4 h-4" />
+                              <Save className="w-3 h-3" />
                               Save
                             </button>
                           </td>
@@ -918,13 +938,12 @@ export default function ScoringPage({
                           key={entry.id}
                           className="border-t border-white/10 hover:bg-white/5"
                         >
-                          <td className="px-4 py-3">{entry.start_order}</td>
-                          <td className="px-4 py-3">{entry.bib_number || '-'}</td>
-                          <td className="px-4 py-3 font-medium">{entry.rider_name}</td>
-                          <td className="px-4 py-3">{entry.horse_name}</td>
-                          <td className="px-4 py-3">{entry.team_name || '-'}</td>
+                          <td className="px-2 py-2">{entry.start_order}</td>
+                          <td className="px-2 py-2 font-medium text-sm truncate" title={entry.rider_name}>{entry.rider_name}</td>
+                          <td className="px-2 py-2 text-sm truncate" title={entry.horse_name}>{entry.horse_name}</td>
+                          <td className="px-2 py-2 text-sm truncate">{entry.team_name || '-'}</td>
 
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-2">
                             <input
                               type="number"
                               step="0.01"
@@ -932,49 +951,49 @@ export default function ScoringPage({
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'time_taken', e.target.value)
                               }
-                              className="w-24 px-2 py-1 bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                              className="w-16 px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
                               placeholder="0.00"
                             />
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-2">
                             <input
                               type="number"
                               value={data.jumping_faults}
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'jumping_faults', e.target.value)
                               }
-                              className="w-20 px-2 py-1 bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                              className="w-12 px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
                             />
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-2">
                             <input
                               type="number"
                               value={data.time_faults}
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'time_faults', e.target.value)
                               }
-                              className="w-20 px-2 py-1 bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                              className="w-12 px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
                               disabled={!!classInfo?.time_allowed}
                             />
                           </td>
 
-                          <td className="px-4 py-3 font-bold text-yellow-400">
+                          <td className="px-2 py-2 font-bold text-yellow-400 text-sm">
                             {totalFaults}
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-2">
                             <select
                               value={data.status}
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'status', e.target.value)
                               }
-                              className={`px-2 py-1 bg-${getStatusColor(
+                              className={`px-1 py-1 text-xs bg-${getStatusColor(
                                 data.status
                               )}-600/30 border border-${getStatusColor(
                                 data.status
-                              )}-600/50 rounded focus:outline-none`}
+                              )}-600/50 rounded focus:outline-none w-full`}
                             >
                               {STATUS_OPTIONS.map((option) => (
                                 <option key={option.value} value={option.value}>
@@ -984,24 +1003,24 @@ export default function ScoringPage({
                             </select>
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="px-2 py-2">
                             <input
                               type="text"
                               value={data.notes}
                               onChange={(e) =>
                                 handleInputChange(entry.id, 'notes', e.target.value)
                               }
-                              className="w-32 px-2 py-1 bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                              className="w-full px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
                               placeholder="Notes..."
                             />
                           </td>
 
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-2 py-2 text-right">
                             <button
                               onClick={() => handleSaveScore(entry.id)}
-                              className="flex items-center gap-2 px-3 py-1 bg-green-600 hover:bg-green-500 rounded transition text-sm"
+                              className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-500 rounded transition text-xs"
                             >
-                              <Save className="w-4 h-4" />
+                              <Save className="w-3 h-3" />
                               Save
                             </button>
                           </td>
