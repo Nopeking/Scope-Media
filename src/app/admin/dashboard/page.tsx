@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Play, Pause, Upload, Users, Eye, Settings, Archive } from 'lucide-react';
+import { Plus, Edit, Trash2, Play, Pause, Upload, Users, Eye, Settings, Archive, Search, Trophy } from 'lucide-react';
 import { LiveStream, ArchivedVideo } from '@/types';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -16,23 +16,32 @@ function AdminDashboardContent() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [modalType, setModalType] = useState('content'); // 'content', 'stream', 'video', 'title'
+  const [modalType, setModalType] = useState('content'); // 'content', 'stream', 'video', 'title', 'user-media'
   const [editingUser, setEditingUser] = useState<any>(null);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [selectedUserForMedia, setSelectedUserForMedia] = useState<any>(null);
   
   // State for managing content
   const [liveStreams, setLiveStreams] = useState<LiveStream[]>(initialLiveStreams);
   const [archivedVideos, setArchivedVideos] = useState<ArchivedVideo[]>(initialArchivedVideos);
   const [customTitles, setCustomTitles] = useState<string[]>(initialCustomTitles);
   const [users, setUsers] = useState<any[]>([]);
+  const [libraryItems, setLibraryItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+
   // Form state
   const [formData, setFormData] = useState({
     title: '',
     url: '',
     customTitle: '',
-    thumbnail: ''
+    thumbnail: '',
+    description: '',
+    contentType: 'video' as 'video' | 'photo' | 'document',
+    selectedUsers: [] as string[],
+    fileSize: '',
+    duration: '',
+    tags: ''
   });
   
   // File upload state
@@ -41,7 +50,7 @@ function AdminDashboardContent() {
   // Initialize tab from URL parameter
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['overview', 'live-streams', 'archived-videos', 'custom-titles', 'users'].includes(tab)) {
+    if (tab && ['overview', 'live-streams', 'archived-videos', 'custom-titles', 'users', 'personal-library', 'shows'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -57,24 +66,27 @@ function AdminDashboardContent() {
           fetch('/api/titles'),
           fetch('/api/users')
         ]);
-        
+
         const streams = await streamsRes.json();
         const videos = await videosRes.json();
         const titles = await titlesRes.json();
         const usersData = await usersRes.json();
-        
-        setLiveStreams(streams);
-        setArchivedVideos(videos);
-        setCustomTitles(titles);
-        setUsers(usersData);
+
+        setLiveStreams(Array.isArray(streams) ? streams : []);
+        setArchivedVideos(Array.isArray(videos) ? videos : []);
+        setCustomTitles(Array.isArray(titles) ? titles : []);
+        setUsers(Array.isArray(usersData) ? usersData : []);
         console.log('Users data received:', usersData);
+        console.log('Is users array?', Array.isArray(usersData));
       } catch (error) {
         console.error('Error fetching data:', error);
+        // Ensure arrays are set even on error
+        setUsers([]);
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     fetchData();
   }, []);
 
@@ -84,6 +96,8 @@ function AdminDashboardContent() {
     { id: 'archived-videos', label: 'Archived Videos', icon: Pause },
     { id: 'custom-titles', label: 'Custom Titles', icon: Settings },
     { id: 'users', label: 'Users', icon: Users },
+    { id: 'personal-library', label: 'Personal Library', icon: Upload },
+    { id: 'shows', label: 'Shows', icon: Trophy },
   ];
 
   const handleTabChange = (tabId: string) => {
@@ -244,12 +258,70 @@ function AdminDashboardContent() {
             throw new Error('Failed to add title');
           }
         }
+      } else if (modalType === 'user-media') {
+        // Add content to rider's library (users can access via linked rider)
+        if (!formData.title || !formData.url || !selectedUserForMedia) {
+          alert('Please fill in title and file URL.');
+          return;
+        }
+
+        // Check if user has linked riders
+        if (!selectedUserForMedia.user_riders || selectedUserForMedia.user_riders.length === 0) {
+          alert('This user has no linked riders. Please ask them to link a rider profile first.');
+          return;
+        }
+
+        // Use the first linked rider
+        const linkedRider = selectedUserForMedia.user_riders[0];
+        const riderId = linkedRider.rider_id;
+
+        const newItem = {
+          rider_id: riderId,
+          title: formData.title,
+          description: formData.description || null,
+          content_type: formData.contentType,
+          file_url: formData.url,
+          thumbnail_url: formData.thumbnail || null,
+          file_size: formData.fileSize ? parseInt(formData.fileSize) : null,
+          duration: formData.duration || null,
+          tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : null,
+          is_public: false,
+          uploaded_by_admin: null, // Would need current admin user ID
+          metadata: { uploaded_for_user: selectedUserForMedia.id }
+        };
+
+        const response = await fetch('/api/rider-library', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newItem)
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to add library item for rider ${riderId}`);
+        }
+
+        await response.json();
+        const riderName = linkedRider.riders?.full_name || 'rider';
+        console.log(`✅ Library item added for rider ${riderName}`);
+        alert(`Successfully added to ${riderName}'s library!\n\nAll users linked to this rider can now see this content.`);
       }
 
       // Reset form and close modal
-      setFormData({ title: '', url: '', customTitle: '', thumbnail: '' });
+      setFormData({
+        title: '',
+        url: '',
+        customTitle: '',
+        thumbnail: '',
+        description: '',
+        contentType: 'video',
+        selectedUsers: [],
+        fileSize: '',
+        duration: '',
+        tags: ''
+      });
       setUploadedThumbnail(null);
       setShowAddModal(false);
+      setSelectedUserForMedia(null);
     } catch (error: any) {
       console.error('❌ Error adding content:', error);
       const errorMessage = error.message || 'Unknown error';
@@ -787,14 +859,77 @@ function AdminDashboardContent() {
                       <h3 className="text-lg font-semibold text-slate-800 mb-2">All Users</h3>
                       <p className="text-slate-600">Manage user accounts and their libraries</p>
                     </div>
-                    
+
+                    {/* Search Bar */}
+                    <div className="mb-6">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search users by name, email, licence, or FEI ID..."
+                          value={userSearchQuery}
+                          onChange={(e) => setUserSearchQuery(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        {userSearchQuery && (
+                          <button
+                            onClick={() => setUserSearchQuery('')}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {users.length > 0 ? (
-                        users.map((user) => {
-                          const initials = user.full_name 
+                      {(() => {
+                        const filteredUsers = users.filter((user) => {
+                          if (!userSearchQuery) return true;
+                          const searchLower = userSearchQuery.toLowerCase();
+                          const nameMatch = user.full_name?.toLowerCase().includes(searchLower);
+                          const emailMatch = user.email?.toLowerCase().includes(searchLower);
+
+                          // Search in linked rider data (licence and FEI registration)
+                          const riderMatch = user.user_riders?.some((userRider: any) => {
+                            const rider = userRider.riders;
+                            if (!rider) return false;
+                            const licenceMatch = rider.licence?.toLowerCase().includes(searchLower);
+                            const feiMatch = rider.fei_registration?.toLowerCase().includes(searchLower);
+                            return licenceMatch || feiMatch;
+                          });
+
+                          return nameMatch || emailMatch || riderMatch;
+                        });
+
+                        if (filteredUsers.length === 0) {
+                          return (
+                            <div className="col-span-full text-center py-8">
+                              {userSearchQuery ? (
+                                <>
+                                  <Search className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                                  <p className="text-slate-500">No users found matching "{userSearchQuery}"</p>
+                                  <button
+                                    onClick={() => setUserSearchQuery('')}
+                                    className="mt-3 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                  >
+                                    Clear search
+                                  </button>
+                                </>
+                              ) : (
+                                <p className="text-slate-500">No users found. Users will appear here once they sign up.</p>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        return filteredUsers.map((user) => {
+                          const initials = user.full_name
                             ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
                             : user.email.substring(0, 2).toUpperCase();
-                          
+
                           const planColors = {
                             free: 'text-blue-600',
                             premium: 'text-green-600',
@@ -834,31 +969,218 @@ function AdminDashboardContent() {
                                   </span>
                                 </div>
                               </div>
-                              <div className="flex gap-2 mt-3">
-                                <button 
+
+                              {/* Linked Rider Information */}
+                              {user.user_riders && user.user_riders.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-slate-200">
+                                  <h5 className="text-xs font-semibold text-slate-700 mb-2">Linked Rider</h5>
+                                  {user.user_riders.map((userRider: any) => (
+                                    <div key={userRider.id} className="text-xs text-slate-600 space-y-1">
+                                      <p className="font-medium text-slate-800">{userRider.riders?.full_name || 'N/A'}</p>
+                                      {userRider.riders?.licence && (
+                                        <p><span className="text-slate-500">Licence:</span> {userRider.riders.licence}</p>
+                                      )}
+                                      {userRider.riders?.fei_registration && (
+                                        <p><span className="text-slate-500">FEI:</span> {userRider.riders.fei_registration}</p>
+                                      )}
+                                      {userRider.riders?.club_name && (
+                                        <p><span className="text-slate-500">Club:</span> {userRider.riders.club_name}</p>
+                                      )}
+                                      <button
+                                        onClick={async () => {
+                                          if (!confirm(`Unlink ${userRider.riders?.full_name} from ${user.full_name || user.email}?`)) {
+                                            return;
+                                          }
+                                          try {
+                                            const response = await fetch(`/api/riders/link?link_id=${userRider.id}&user_id=${user.id}`, {
+                                              method: 'DELETE',
+                                            });
+                                            if (response.ok) {
+                                              alert('Rider unlinked successfully');
+                                              // Refresh users
+                                              const usersRes = await fetch('/api/users');
+                                              const usersData = await usersRes.json();
+                                              setUsers(Array.isArray(usersData) ? usersData : []);
+                                            } else {
+                                              const error = await response.json();
+                                              alert(`Failed to unlink: ${error.error || 'Unknown error'}`);
+                                            }
+                                          } catch (error) {
+                                            console.error('Error unlinking rider:', error);
+                                            alert('Error unlinking rider');
+                                          }
+                                        }}
+                                        className="mt-2 px-3 py-1 text-xs font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded border border-red-300 transition-colors"
+                                      >
+                                        Unlink Rider
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="flex flex-col gap-2 mt-3">
+                                <button
                                   onClick={() => {
-                                    // Navigate to user's library
-                                    window.open(`/my-library?userId=${user.id}`, '_blank');
+                                    setSelectedUserForMedia(user);
+                                    setModalType('user-media');
+                                    setShowAddModal(true);
                                   }}
-                                  className="flex-1 bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors"
+                                  className="w-full bg-green-500 text-white px-3 py-2 rounded text-sm hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
                                 >
-                                  View Library
+                                  <Upload className="h-4 w-4" />
+                                  Add Media
                                 </button>
-                                <button 
-                                  onClick={() => handleEditUser(user)}
-                                  className="flex-1 bg-slate-100 text-slate-600 px-3 py-1 rounded text-sm hover:bg-slate-200 transition-colors"
-                                >
-                                  Edit
-                                </button>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      // Navigate to user's library
+                                      window.open(`/my-library?userId=${user.id}`, '_blank');
+                                    }}
+                                    className="flex-1 bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors"
+                                  >
+                                    View Library
+                                  </button>
+                                  <button
+                                    onClick={() => handleEditUser(user)}
+                                    className="flex-1 bg-slate-100 text-slate-600 px-3 py-1 rounded text-sm hover:bg-slate-200 transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );
-                        })
-                      ) : (
-                        <div className="col-span-full text-center py-8">
-                          <p className="text-slate-500">No users found. Users will appear here once they sign up.</p>
+                        });
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'personal-library' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-800">Personal Library Management</h2>
+                  <p className="text-slate-600 mt-2">
+                    View all user library items. To add media to a user's library, go to the
+                    <button
+                      onClick={() => handleTabChange('users')}
+                      className="text-blue-600 hover:text-blue-700 font-medium mx-1"
+                    >
+                      Users tab
+                    </button>
+                    and click "Add Media" on their profile.
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-2">Cloud Drive Integration</h3>
+                    <p className="text-slate-600 text-sm">
+                      Add videos and photos from Google Drive, OneDrive, Dropbox, or any cloud storage service.
+                      Simply paste the direct link or embed URL.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {libraryItems.length > 0 ? (
+                      libraryItems.map((item) => (
+                        <div key={item.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="aspect-video bg-slate-100 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                            {item.thumbnail_url ? (
+                              <img src={item.thumbnail_url} alt={item.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="text-slate-400">
+                                {item.content_type === 'video' ? '🎥' : '📸'}
+                              </div>
+                            )}
+                          </div>
+                          <h4 className="font-semibold text-slate-800 truncate">{item.title}</h4>
+                          <p className="text-sm text-slate-500 mb-2">{item.content_type}</p>
+                          <div className="flex gap-2">
+                            <button className="flex-1 bg-red-50 text-red-600 px-3 py-1 rounded text-sm hover:bg-red-100 transition-colors">
+                              Delete
+                            </button>
+                          </div>
                         </div>
-                      )}
+                      ))
+                    ) : (
+                      <div className="col-span-full text-center py-12">
+                        <Upload className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-slate-800 mb-2">No media files yet</h3>
+                        <p className="text-slate-500 mb-4">
+                          Go to the Users tab and click "Add Media" on a user's profile to add content to their library
+                        </p>
+                        <button
+                          onClick={() => handleTabChange('users')}
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg inline-flex items-center gap-2"
+                        >
+                          <Users className="h-4 w-4" />
+                          Go to Users Tab
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'shows' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
+                    <Trophy className="h-8 w-8 text-yellow-500" />
+                    Shows Management
+                  </h2>
+                  <p className="text-slate-600 mt-2">
+                    Manage show jumping competitions, classes, startlists, and live scoring
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <div className="text-center py-12">
+                    <Trophy className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-slate-800 mb-2">Show Jumping Competition Management</h3>
+                    <p className="text-slate-500 mb-6 max-w-md mx-auto">
+                      Create and manage shows, classes with 11 different rule types, upload startlists via Excel, and run live scoring sessions.
+                    </p>
+                    <button
+                      onClick={() => router.push('/admin/shows')}
+                      className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-lg inline-flex items-center gap-2 font-medium text-lg"
+                    >
+                      <Trophy className="h-5 w-5" />
+                      Go to Shows Management
+                    </button>
+
+                    <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto text-left">
+                      <div className="bg-slate-50 p-4 rounded-lg">
+                        <h4 className="font-semibold text-slate-800 mb-2">Shows & Classes</h4>
+                        <p className="text-sm text-slate-600">
+                          Create national and international shows with multiple classes and rule types
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 p-4 rounded-lg">
+                        <h4 className="font-semibold text-slate-800 mb-2">Startlist Management</h4>
+                        <p className="text-sm text-slate-600">
+                          Upload startlists via Excel or add riders manually with bib numbers
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 p-4 rounded-lg">
+                        <h4 className="font-semibold text-slate-800 mb-2">Live Scoring</h4>
+                        <p className="text-sm text-slate-600">
+                          Enter scores in real-time with automatic rankings and leaderboards
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -883,9 +1205,13 @@ function AdminDashboardContent() {
                   {modalType === 'stream' && 'Add Live Stream'}
                   {modalType === 'video' && 'Upload Video'}
                   {modalType === 'title' && 'Add Custom Title'}
+                  {modalType === 'user-media' && `Add Media for ${selectedUserForMedia?.full_name || selectedUserForMedia?.email}`}
                 </h3>
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setSelectedUserForMedia(null);
+                  }}
                   className="text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1055,6 +1381,262 @@ function AdminDashboardContent() {
                     </div>
                 )}
 
+                {modalType === 'user-media' && (
+                  <>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                      <p className="text-sm text-blue-800">
+                        <strong>Adding media for:</strong> {selectedUserForMedia?.full_name || selectedUserForMedia?.email}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Content Type</label>
+                      <select
+                        name="contentType"
+                        value={formData.contentType}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="video">Video</option>
+                        <option value="photo">Photo</option>
+                        <option value="document">Document</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Title *</label>
+                      <input
+                        type="text"
+                        name="title"
+                        value={formData.title}
+                        onChange={handleInputChange}
+                        placeholder="Enter media title"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Cloud Drive URL *</label>
+                      <input
+                        type="url"
+                        name="url"
+                        value={formData.url}
+                        onChange={handleInputChange}
+                        placeholder="https://drive.google.com/... or https://onedrive.live.com/..."
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        Paste the shareable link from Google Drive, OneDrive, Dropbox, or any cloud storage
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Description (Optional)</label>
+                      <textarea
+                        name="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Enter description"
+                        rows={3}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Thumbnail URL (Optional)</label>
+                      <input
+                        type="url"
+                        name="thumbnail"
+                        value={formData.thumbnail}
+                        onChange={handleInputChange}
+                        placeholder="https://example.com/thumbnail.jpg"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">File Size (MB)</label>
+                        <input
+                          type="text"
+                          name="fileSize"
+                          value={formData.fileSize}
+                          onChange={handleInputChange}
+                          placeholder="e.g., 250"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Duration</label>
+                        <input
+                          type="text"
+                          name="duration"
+                          value={formData.duration}
+                          onChange={handleInputChange}
+                          placeholder="e.g., 15:30"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Tags (Optional, comma-separated)</label>
+                      <input
+                        type="text"
+                        name="tags"
+                        value={formData.tags}
+                        onChange={handleInputChange}
+                        placeholder="e.g., tutorial, demo, highlights"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {modalType === 'library' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Content Type</label>
+                      <select
+                        name="contentType"
+                        value={formData.contentType}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="video">Video</option>
+                        <option value="photo">Photo</option>
+                        <option value="document">Document</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Title</label>
+                      <input
+                        type="text"
+                        name="title"
+                        value={formData.title}
+                        onChange={handleInputChange}
+                        placeholder="Enter media title"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Cloud Drive URL</label>
+                      <input
+                        type="url"
+                        name="url"
+                        value={formData.url}
+                        onChange={handleInputChange}
+                        placeholder="https://drive.google.com/... or https://onedrive.live.com/..."
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        Paste the shareable link from Google Drive, OneDrive, Dropbox, or any cloud storage
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Description (Optional)</label>
+                      <textarea
+                        name="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Enter description"
+                        rows={3}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Thumbnail URL (Optional)</label>
+                      <input
+                        type="url"
+                        name="thumbnail"
+                        value={formData.thumbnail}
+                        onChange={handleInputChange}
+                        placeholder="https://example.com/thumbnail.jpg"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">File Size (MB, Optional)</label>
+                        <input
+                          type="text"
+                          name="fileSize"
+                          value={formData.fileSize}
+                          onChange={handleInputChange}
+                          placeholder="e.g., 250"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Duration (Optional)</label>
+                        <input
+                          type="text"
+                          name="duration"
+                          value={formData.duration}
+                          onChange={handleInputChange}
+                          placeholder="e.g., 15:30"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Select Users</label>
+                      <div className="max-h-40 overflow-y-auto border border-slate-300 rounded-lg p-3 space-y-2">
+                        {users.length > 0 ? (
+                          users.map((user) => (
+                            <label key={user.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                              <input
+                                type="checkbox"
+                                checked={formData.selectedUsers.includes(user.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      selectedUsers: [...prev.selectedUsers, user.id]
+                                    }));
+                                  } else {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      selectedUsers: prev.selectedUsers.filter(id => id !== user.id)
+                                    }));
+                                  }
+                                }}
+                                className="rounded border-slate-300"
+                              />
+                              <span className="text-sm text-slate-700">
+                                {user.full_name || user.email}
+                              </span>
+                            </label>
+                          ))
+                        ) : (
+                          <p className="text-sm text-slate-500">No users available</p>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Selected: {formData.selectedUsers.length} user(s)
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Tags (Optional, comma-separated)</label>
+                      <input
+                        type="text"
+                        name="tags"
+                        value={formData.tags}
+                        onChange={handleInputChange}
+                        placeholder="e.g., tutorial, demo, highlights"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </>
+                )}
+
                 {modalType === 'content' && (
                   <div className="space-y-3">
                     <button
@@ -1099,7 +1681,10 @@ function AdminDashboardContent() {
 
               <div className="flex gap-3 mt-6">
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setSelectedUserForMedia(null);
+                  }}
                   className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   Cancel

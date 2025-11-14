@@ -19,8 +19,16 @@ if (typeof window !== 'undefined' && (!supabaseUrl || !supabaseAnonKey)) {
 
 // Client for public access (e.g., fetching data on client-side)
 // Only create client if we have valid environment variables
-export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient<Database>(supabaseUrl, supabaseAnonKey)
+export const supabase = (supabaseUrl && supabaseAnonKey)
+  ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce',
+      },
+    })
   : null;
 
 // Client for admin access (e.g., server-side operations with service role key)

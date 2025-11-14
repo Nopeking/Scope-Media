@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
+    // Fetch users
     const { data: users, error } = await supabaseAdmin
       .from('user_profiles')
       .select('*')
@@ -22,8 +23,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 
-    console.log(`✅ Fetched ${users?.length || 0} users`);
-    return NextResponse.json(users || []);
+    // Fetch user_riders with rider data for all users
+    const { data: userRiders, error: riderError } = await supabaseAdmin
+      .from('user_riders')
+      .select(`
+        id,
+        user_id,
+        rider_id,
+        verified,
+        linked_at,
+        riders (
+          id,
+          first_name,
+          last_name,
+          full_name,
+          licence,
+          fei_registration,
+          club_name,
+          country
+        )
+      `);
+
+    if (riderError) {
+      console.error('❌ Error fetching user riders:', riderError);
+      // Continue without rider data instead of failing
+    }
+
+    // Merge rider data with users
+    const usersWithRiders = users?.map(user => ({
+      ...user,
+      user_riders: userRiders?.filter(ur => ur.user_id === user.id) || []
+    })) || [];
+
+    console.log(`✅ Fetched ${usersWithRiders.length} users with rider data`);
+    return NextResponse.json(usersWithRiders);
   } catch (error: any) {
     console.error('❌ Error in users GET:', error);
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });

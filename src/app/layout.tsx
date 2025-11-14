@@ -4,6 +4,7 @@ import "./globals.css";
 import ClientNavigation from "@/components/ClientNavigation";
 import HydrationFix from "@/components/HydrationFix";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import Script from "next/script";
 
 const inter = Inter({
@@ -220,11 +221,13 @@ export default function RootLayout({
         <body className={`${inter.variable} font-display antialiased`} suppressHydrationWarning>
           <HydrationFix />
           <AuthProvider>
-            <ClientNavigation>
-              <main className="flex-1" suppressHydrationWarning>
-                {children}
-              </main>
-            </ClientNavigation>
+            <AdminAuthProvider>
+              <ClientNavigation>
+                <main className="flex-1" suppressHydrationWarning>
+                  {children}
+                </main>
+              </ClientNavigation>
+            </AdminAuthProvider>
           </AuthProvider>
         </body>
       </html>

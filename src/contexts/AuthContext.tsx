@@ -32,35 +32,99 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-      } else {
+    // Get initial session with error handling
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          console.error('Error getting session:', error);
+          // Check if it's an invalid refresh token error
+          const errorMessage = error.message || '';
+          const isRefreshTokenError = 
+            errorMessage.includes('Refresh Token') || 
+            errorMessage.includes('refresh_token') ||
+            errorMessage.includes('Invalid Refresh Token') ||
+            errorMessage.includes('Refresh Token Not Found') ||
+            error?.status === 401;
+          
+          if (isRefreshTokenError) {
+            console.log('Invalid refresh token detected, clearing session...');
+            // Clear invalid session
+            supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            setUserProfile(null);
+          }
+          setLoading(false);
+          return;
+        }
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          fetchUserProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((error: any) => {
+        console.error('Error in getSession:', error);
+        // Check if it's an invalid refresh token error
+        const errorMessage = error?.message || '';
+        const isRefreshTokenError = 
+          errorMessage.includes('Refresh Token') || 
+          errorMessage.includes('refresh_token') ||
+          errorMessage.includes('Invalid Refresh Token') ||
+          errorMessage.includes('Refresh Token Not Found') ||
+          error?.status === 401;
+        
+        if (isRefreshTokenError) {
+          console.log('Invalid refresh token detected, clearing session...');
+          supabase.auth.signOut();
+        }
+        setSession(null);
+        setUser(null);
+        setUserProfile(null);
         setLoading(false);
-      }
-    });
+      });
 
-    // Listen for auth changes
+    // Listen for auth changes with error handling
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change:', event, session?.user?.id);
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        // Only fetch profile for SIGNED_IN events or if user is confirmed
-        if (event === 'SIGNED_IN' || session.user.email_confirmed_at) {
-          await fetchUserProfile(session.user.id);
+      try {
+        console.log('Auth state change:', event, session?.user?.id);
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Only fetch profile for SIGNED_IN events or if user is confirmed
+          if (event === 'SIGNED_IN' || session.user.email_confirmed_at) {
+            await fetchUserProfile(session.user.id);
+          } else {
+            console.log('User not confirmed yet, skipping profile fetch');
+            setLoading(false);
+          }
         } else {
-          console.log('User not confirmed yet, skipping profile fetch');
+          setUserProfile(null);
           setLoading(false);
         }
-      } else {
-        setUserProfile(null);
+      } catch (error: any) {
+        console.error('Error in auth state change:', error);
+        // Check if it's an invalid refresh token error
+        const errorMessage = error?.message || '';
+        const isRefreshTokenError = 
+          errorMessage.includes('Refresh Token') || 
+          errorMessage.includes('refresh_token') ||
+          errorMessage.includes('Invalid Refresh Token') ||
+          errorMessage.includes('Refresh Token Not Found') ||
+          error?.status === 401;
+        
+        if (isRefreshTokenError) {
+          console.log('Invalid refresh token detected in auth state change, clearing session...');
+          await supabase.auth.signOut();
+          setSession(null);
+          setUser(null);
+          setUserProfile(null);
+        }
         setLoading(false);
       }
     });
@@ -76,12 +140,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       console.log('Fetching user profile for:', userId);
-      
-      const { data, error } = await supabase
+
+      // Add a timeout to prevent infinite loading (30 seconds for slow connections)
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 30000)
+      );
+
+      const fetchPromise = supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single();
+
+      const result = await Promise.race([fetchPromise, timeout]);
+      const { data, error } = result as any;
+
+      console.log('Profile fetch result:', { data, error, hasData: !!data, hasError: !!error });
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
         console.error('Error fetching user profile:', error);
@@ -91,31 +165,93 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hint: error.hint,
           code: error.code
         });
+        setLoading(false); // Ensure loading stops even on error
       } else if (data) {
         console.log('User profile found:', data);
         setUserProfile(data);
+        setLoading(false);
       } else {
         console.log('No user profile found, creating new one...');
         // Create profile if it doesn't exist
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData.user) {
-          await createUserProfile(userData.user);
+        try {
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          // Check if it's an invalid refresh token error
+          if (userError) {
+            const errorMessage = userError.message || '';
+            const isRefreshTokenError = 
+              errorMessage.includes('Refresh Token') || 
+              errorMessage.includes('refresh_token') ||
+              errorMessage.includes('Invalid Refresh Token') ||
+              errorMessage.includes('Refresh Token Not Found') ||
+              userError?.status === 401;
+            
+            if (isRefreshTokenError) {
+              console.log('Invalid refresh token detected, clearing session...');
+              await supabase.auth.signOut();
+              setSession(null);
+              setUser(null);
+              setUserProfile(null);
+              setLoading(false);
+              return;
+            }
+            throw userError;
+          }
+          if (userData.user) {
+            await createUserProfile(userData.user);
+          } else {
+            setLoading(false);
+          }
+        } catch (error: any) {
+          console.error('Error getting user:', error);
+          // Check if it's an invalid refresh token error
+          const errorMessage = error?.message || '';
+          const isRefreshTokenError = 
+            errorMessage.includes('Refresh Token') || 
+            errorMessage.includes('refresh_token') ||
+            errorMessage.includes('Invalid Refresh Token') ||
+            errorMessage.includes('Refresh Token Not Found') ||
+            error?.status === 401;
+          
+          if (isRefreshTokenError) {
+            console.log('Invalid refresh token detected, clearing session...');
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            setUserProfile(null);
+          }
+          setLoading(false);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in fetchUserProfile:', error);
-    } finally {
-      setLoading(false);
+      // Check if it's an invalid refresh token error
+      const errorMessage = error?.message || '';
+      const isRefreshTokenError = 
+        errorMessage.includes('Refresh Token') || 
+        errorMessage.includes('refresh_token') ||
+        errorMessage.includes('Invalid Refresh Token') ||
+        errorMessage.includes('Refresh Token Not Found') ||
+        error?.status === 401;
+      
+      if (isRefreshTokenError) {
+        console.log('Invalid refresh token detected, clearing session...');
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setUserProfile(null);
+      }
+      setLoading(false); // Always stop loading on error
     }
   };
 
   const createUserProfile = async (user: User) => {
     try {
       console.log('Creating user profile for:', user.id, user.email);
-      
+
       // Check if user is confirmed
       if (!user.email_confirmed_at && !user.phone_confirmed_at) {
         console.log('User not confirmed yet, cannot create profile');
+        setLoading(false);
         return;
       }
 
@@ -138,18 +274,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hint: error.hint,
           code: error.code
         });
-        
+
         // If it's a foreign key constraint error, the user might not be in auth.users yet
         if (error.code === '23503') {
           console.log('User not found in auth.users, retrying in 2 seconds...');
           setTimeout(() => createUserProfile(user), 2000);
+        } else {
+          setLoading(false); // Stop loading on non-retryable errors
         }
       } else {
         console.log('User profile created successfully:', data);
         setUserProfile(data);
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error in createUserProfile:', error);
+      setLoading(false); // Always stop loading on error
     }
   };
 
