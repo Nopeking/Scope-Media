@@ -490,6 +490,20 @@ CREATE TABLE IF NOT EXISTS classes (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Add scoring_password column to classes if it doesn't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'classes' 
+        AND column_name = 'scoring_password'
+    ) THEN
+        ALTER TABLE classes ADD COLUMN scoring_password TEXT;
+        RAISE NOTICE 'Column scoring_password added to classes table';
+    END IF;
+END $$;
+
 -- Create startlist table
 CREATE TABLE IF NOT EXISTS startlist (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -506,6 +520,55 @@ CREATE TABLE IF NOT EXISTS startlist (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add missing columns to startlist table if they don't exist
+DO $$ 
+BEGIN
+    -- Add fei_id column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'startlist' 
+        AND column_name = 'fei_id'
+    ) THEN
+        ALTER TABLE startlist ADD COLUMN fei_id TEXT;
+        RAISE NOTICE 'Column fei_id added to startlist table';
+    END IF;
+
+    -- Add license column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'startlist' 
+        AND column_name = 'license'
+    ) THEN
+        ALTER TABLE startlist ADD COLUMN license TEXT;
+        RAISE NOTICE 'Column license added to startlist table';
+    END IF;
+
+    -- Add club_name column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'startlist' 
+        AND column_name = 'club_name'
+    ) THEN
+        ALTER TABLE startlist ADD COLUMN club_name TEXT;
+        RAISE NOTICE 'Column club_name added to startlist table';
+    END IF;
+
+    -- Ensure rider_id allows NULL (drop NOT NULL constraint if it exists)
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'startlist' 
+        AND column_name = 'rider_id'
+        AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE startlist ALTER COLUMN rider_id DROP NOT NULL;
+        RAISE NOTICE 'NOT NULL constraint removed from rider_id column';
+    END IF;
+END $$;
 
 -- Create scores table
 CREATE TABLE IF NOT EXISTS scores (
