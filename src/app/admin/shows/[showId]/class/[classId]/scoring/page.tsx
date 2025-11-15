@@ -489,9 +489,8 @@ export default function ScoringPage({
       }
     } else {
       // Non-two-phase: Use existing scores
-      return Object.values(scores)
+      const leaderboard = Object.values(scores)
         .filter((score) => score.status === 'completed')
-        .sort((a, b) => a.total_faults - b.total_faults || (a.time_taken || 999) - (b.time_taken || 999))
         .map((score) => {
           const entry = startlist.find((e) => e.id === score.startlist_id);
           return {
@@ -502,6 +501,32 @@ export default function ScoringPage({
             time_taken: score.time_taken,
           };
         });
+
+      // Sort based on class rule
+      if (classInfo?.class_rule === 'optimum_time' && classInfo?.optimum_time) {
+        const optimumTime = classInfo.optimum_time;
+        // For optimum_time: Sort by faults first, then by absolute difference from optimum time
+        return leaderboard.sort((a, b) => {
+          // First sort by total faults (0 faults rank higher)
+          if (a.total_faults !== b.total_faults) {
+            return a.total_faults - b.total_faults;
+          }
+          // Then sort by absolute difference from optimum time (closest to optimum wins)
+          const timeA = a.time_taken || 999;
+          const timeB = b.time_taken || 999;
+          const diffA = Math.abs(timeA - optimumTime);
+          const diffB = Math.abs(timeB - optimumTime);
+          return diffA - diffB;
+        });
+      } else {
+        // For other classes: Sort by faults first, then by time (fastest wins)
+        return leaderboard.sort((a, b) => {
+          if (a.total_faults !== b.total_faults) {
+            return a.total_faults - b.total_faults;
+          }
+          return (a.time_taken || 999) - (b.time_taken || 999);
+        });
+      }
     }
   };
 
