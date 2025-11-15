@@ -1,21 +1,12 @@
 [build]
   command = "npm run build"
-  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "22"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
-
-[context.production.environment]
-  # Supabase configuration for Netlify
+  # Supabase configuration - available for all contexts
   NEXT_PUBLIC_SUPABASE_URL = "https://lfvoeszwxkblygruyonm.supabase.co"
   NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxmdm9lc3p3eGtibHlncnV5b25tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNjU4NDIsImV4cCI6MjA3NTg0MTg0Mn0.pxwVuhbDwrTEJ5Pm1O_w7PEXmQ3KEmCp0ElM_Q15GKQ"
   SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxmdm9lc3p3eGtibHlncnV5b25tIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDI2NTg0MiwiZXhwIjoyMDc1ODQxODQyfQ.eminLANCELQS-SXjQ6qwIa3TzN1IUDcYPO0qMGzrG60"
 
-# Handle client-side routing
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
