@@ -141,9 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Fetching user profile for:', userId);
 
-      // Add a timeout to prevent infinite loading (30 seconds for slow connections)
-      const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 30000)
+      // Add a timeout to prevent infinite loading (10 seconds - reduced from 30)
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
       );
 
       const fetchPromise = supabase
@@ -152,8 +152,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single();
 
-      const result = await Promise.race([fetchPromise, timeout]);
-      const { data, error } = result as any;
+      let result: any;
+      try {
+        result = await Promise.race([fetchPromise, timeout]);
+      } catch (timeoutError: any) {
+        // Handle timeout gracefully - don't block the app
+        if (timeoutError?.message === 'Profile fetch timeout') {
+          console.warn('Profile fetch timed out after 10 seconds - continuing without profile');
+          setLoading(false);
+          // Don't set userProfile, allow app to continue
+          return;
+        }
+        throw timeoutError;
+      }
+
+      const { data, error } = result;
 
       console.log('Profile fetch result:', { data, error, hasData: !!data, hasError: !!error });
 
@@ -224,10 +237,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       console.error('Error in fetchUserProfile:', error);
+      
+      // Handle timeout errors gracefully - don't block the app
+      if (error?.message === 'Profile fetch timeout') {
+        console.warn('Profile fetch timed out - continuing without profile');
+        setLoading(false);
+        return;
+      }
+      
       // Check if it's an invalid refresh token error
       const errorMessage = error?.message || '';
       const isRefreshTokenError = 
-        errorMessage.includes('Refresh Token') || 
+        errorMessage.includes('Refresh Token') ||
         errorMessage.includes('refresh_token') ||
         errorMessage.includes('Invalid Refresh Token') ||
         errorMessage.includes('Refresh Token Not Found') ||
@@ -240,7 +261,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setUserProfile(null);
       }
-      setLoading(false); // Always stop loading on error
+      // Always set loading to false, even on error, to prevent infinite loading
+      setLoading(false);
     }
   };
 

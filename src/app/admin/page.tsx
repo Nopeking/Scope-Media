@@ -7,8 +7,8 @@ export default function AdminPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to admin shows page (protected by AuthGuard)
-    router.push('/admin/shows');
+    // Redirect to admin dashboard (protected by AuthGuard)
+    router.push('/admin/dashboard');
   }, [router]);
 
   return (

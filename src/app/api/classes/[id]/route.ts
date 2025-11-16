@@ -61,6 +61,41 @@ export async function GET(
       return NextResponse.json({ error: 'Class not found' }, { status: 404 });
     }
 
+    // Automatically update class status based on date and time
+    if (classItem.status !== 'cancelled' && classItem.status !== 'completed' && 
+        classItem.class_date && classItem.start_time) {
+      const now = new Date();
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+      const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
+
+      const classDate = new Date(classItem.class_date);
+      classDate.setHours(0, 0, 0, 0);
+
+      const isToday = today.getTime() === classDate.getTime();
+
+      // Check if class should be ongoing
+      if (isToday && classItem.start_time && classItem.status === 'upcoming') {
+        const [startHour, startMinute] = classItem.start_time.split(':').map(Number);
+        const [currentHour, currentMinute] = currentTime.split(':').map(Number);
+        
+        const startTimeMinutes = startHour * 60 + startMinute;
+        const currentTimeMinutes = currentHour * 60 + currentMinute;
+
+        if (currentTimeMinutes >= startTimeMinutes) {
+          await supabaseAdmin
+            .from('classes')
+            .update({
+              status: 'ongoing',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', id);
+          
+          classItem.status = 'ongoing';
+        }
+      }
+    }
+
     return NextResponse.json(classItem);
   } catch (error) {
     console.error('Error in GET /api/classes/[id]:', error);

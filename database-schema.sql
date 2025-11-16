@@ -484,7 +484,7 @@ CREATE TABLE IF NOT EXISTS classes (
   max_points INTEGER DEFAULT 65,
   number_of_rounds INTEGER DEFAULT 1,
   linked_stream_id UUID REFERENCES streams(id),
-  status TEXT DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'in_progress', 'completed', 'cancelled')),
+  status TEXT DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'ongoing', 'completed', 'cancelled')),
   scoring_password TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -567,6 +567,28 @@ BEGIN
     ) THEN
         ALTER TABLE startlist ALTER COLUMN rider_id DROP NOT NULL;
         RAISE NOTICE 'NOT NULL constraint removed from rider_id column';
+    END IF;
+
+    -- Add is_handicap column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'startlist' 
+        AND column_name = 'is_handicap'
+    ) THEN
+        ALTER TABLE startlist ADD COLUMN is_handicap BOOLEAN DEFAULT false;
+        RAISE NOTICE 'Column is_handicap added to startlist table';
+    END IF;
+
+    -- Add country_code column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'startlist' 
+        AND column_name = 'country_code'
+    ) THEN
+        ALTER TABLE startlist ADD COLUMN country_code TEXT;
+        RAISE NOTICE 'Column country_code added to startlist table';
     END IF;
 END $$;
 
@@ -731,6 +753,46 @@ GRANT ALL ON classes TO service_role;
 GRANT ALL ON startlist TO service_role;
 GRANT ALL ON scores TO service_role;
 GRANT ALL ON team_scores TO service_role;
+
+-- ============================================================================
+-- FLAGS TABLE: Country Flag Management
+-- ============================================================================
+
+-- Create flags table for managing country flags
+CREATE TABLE IF NOT EXISTS flags (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  country_code TEXT NOT NULL UNIQUE, -- ISO country code (e.g., "JOR", "UAE", "GBR")
+  flag_url TEXT NOT NULL, -- URL to the flag image (stored in Supabase Storage)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create index for country_code
+CREATE INDEX IF NOT EXISTS idx_flags_country_code ON flags(country_code);
+
+-- Enable Row Level Security on flags table
+ALTER TABLE flags ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing flags policies
+DROP POLICY IF EXISTS "Allow public read access to flags" ON flags;
+DROP POLICY IF EXISTS "Admins can manage flags" ON flags;
+
+-- Create flags policies
+CREATE POLICY "Allow public read access to flags"
+  ON flags FOR SELECT USING (true);
+
+CREATE POLICY "Admins can manage flags"
+  ON flags FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = auth.uid()
+      AND subscription_plan = 'enterprise'
+    )
+  );
+
+-- Grant permissions for flags table
+GRANT SELECT ON flags TO authenticated;
+GRANT ALL ON flags TO service_role;
 
 -- ============================================================================
 -- SAMPLE DATA

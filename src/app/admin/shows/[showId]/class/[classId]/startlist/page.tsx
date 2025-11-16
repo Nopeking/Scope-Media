@@ -10,10 +10,14 @@ interface StartlistEntry {
   class_id: string;
   rider_name: string;
   rider_id: string;
+  fei_id: string | null;
+  license: string | null;
   horse_name: string;
   horse_id: string | null;
   team_name: string | null;
   club_name: string | null;
+  is_handicap: boolean;
+  country_code: string | null;
   start_order: number;
   created_at: string;
   updated_at: string;
@@ -47,10 +51,13 @@ export default function StartlistPage({
   const [formData, setFormData] = useState({
     rider_name: '',
     rider_id: '',
+    fei_id: '',
+    license: '',
     horse_name: '',
     horse_id: '',
     team_name: '',
     club_name: '',
+    is_handicap: false,
     start_order: '',
   });
 
@@ -90,12 +97,13 @@ export default function StartlistPage({
     e.preventDefault();
 
     try {
-      const response = await fetch('/api/startlist', {
+      const response =       await fetch('/api/startlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
           class_id: classId,
+          rider_id: formData.license || formData.fei_id || null,
           start_order: parseInt(formData.start_order),
         }),
       });
@@ -126,6 +134,7 @@ export default function StartlistPage({
         body: JSON.stringify({
           ...formData,
           class_id: classId,
+          rider_id: formData.license || formData.fei_id || null,
           start_order: parseInt(formData.start_order),
         }),
       });
@@ -158,11 +167,14 @@ export default function StartlistPage({
     setEditingEntry(entry);
     setFormData({
       rider_name: entry.rider_name,
-      rider_id: entry.rider_id,
+      rider_id: entry.rider_id || '',
+      fei_id: entry.fei_id || '',
+      license: entry.license || '',
       horse_name: entry.horse_name,
       horse_id: entry.horse_id || '',
       team_name: entry.team_name || '',
       club_name: entry.club_name || '',
+      is_handicap: entry.is_handicap || false,
       start_order: entry.start_order.toString(),
     });
     setShowAddForm(true);
@@ -172,10 +184,13 @@ export default function StartlistPage({
     setFormData({
       rider_name: '',
       rider_id: '',
+      fei_id: '',
+      license: '',
       horse_name: '',
       horse_id: '',
       team_name: '',
       club_name: '',
+      is_handicap: false,
       start_order: '',
     });
   };
@@ -200,21 +215,31 @@ export default function StartlistPage({
         console.log('📊 Raw Excel data:', jsonData);
 
         // Map Excel columns to our format
-        const entries = jsonData.map((row: any, index: number) => ({
-          class_id: classId,
-          rider_name: row['Rider Name'] || row['rider_name'] || row['RIDER NAME'] || '',
-          // FEI ID mapping
-          fei_id: row['FEI ID'] || row['fei_id'] || row['Rider FEI ID'] || row['rider_fei_id'] || null,
-          // License/Rider ID mapping
-          license: row['Rider ID'] || row['rider_id'] || row['RIDER ID'] || row['License'] || row['license'] || null,
-          // Legacy rider_id field (for backwards compatibility)
-          rider_id: row['Rider ID'] || row['rider_id'] || row['FEI ID'] || row['fei_id'] || null,
-          horse_name: row['Horse Name'] || row['horse_name'] || row['HORSE NAME'] || '',
-          horse_id: row['Horse ID'] || row['horse_id'] || row['HORSE ID'] || null,
-          team_name: row['Team Name'] || row['team_name'] || row['TEAM NAME'] || null,
-          club_name: row['Club Name'] || row['club_name'] || row['CLUB NAME'] || null,
-          start_order: row['S.No'] || row['s.no'] || row['S.NO'] || row['Start Order'] || row['start_order'] || index + 1,
-        }));
+        const entries = jsonData.map((row: any, index: number) => {
+          // Check for H/C column (can be "H/C", "H/C", "Handicap", "handicap", etc.)
+          const isHandicap = row['H/C'] === true || row['H/C'] === 'TRUE' || row['H/C'] === 'true' || 
+                            row['H/C'] === 'Yes' || row['H/C'] === 'YES' || row['H/C'] === 'yes' ||
+                            row['Handicap'] === true || row['Handicap'] === 'TRUE' || row['Handicap'] === 'true' ||
+                            row['handicap'] === true || row['handicap'] === 'TRUE' || row['handicap'] === 'true' ||
+                            row['H/C'] === 'H/C' || row['H/C'] === 'HC';
+
+          return {
+            class_id: classId,
+            rider_name: row['Rider Name'] || row['rider_name'] || row['RIDER NAME'] || '',
+            // FEI ID mapping
+            fei_id: row['FEI ID'] || row['fei_id'] || row['Rider FEI ID'] || row['rider_fei_id'] || null,
+            // License/Rider ID mapping
+            license: row['Rider ID'] || row['rider_id'] || row['RIDER ID'] || row['License'] || row['license'] || null,
+            // Legacy rider_id field (for backwards compatibility)
+            rider_id: row['Rider ID'] || row['rider_id'] || row['FEI ID'] || row['fei_id'] || null,
+            horse_name: row['Horse Name'] || row['horse_name'] || row['HORSE NAME'] || '',
+            horse_id: row['Horse ID'] || row['horse_id'] || row['HORSE ID'] || null,
+            team_name: row['Team Name'] || row['team_name'] || row['TEAM NAME'] || null,
+            club_name: row['Club Name'] || row['club_name'] || row['CLUB NAME'] || null,
+            is_handicap: isHandicap || false,
+            start_order: row['S.No'] || row['s.no'] || row['S.NO'] || row['Start Order'] || row['start_order'] || index + 1,
+          };
+        });
 
         console.log('📤 Mapped entries to send:', entries);
 
@@ -274,9 +299,9 @@ export default function StartlistPage({
   };
 
   const downloadTemplate = () => {
-    const template = `S.No,Rider Name,FEI ID,Rider ID,Horse Name,Horse ID,Team Name,Club Name
-1,John Smith,10204650,LIC123,Thunder,H12345,Team A,Dubai Equestrian Club
-2,Jane Doe,10305751,LIC456,Lightning,H67890,Team A,Abu Dhabi Riding Club`;
+    const template = `S.No,Rider Name,FEI ID,Rider ID,Horse Name,Horse ID,Team Name,Club Name,H/C
+1,John Smith,10204650,LIC123,Thunder,H12345,Team A,Dubai Equestrian Club,
+2,Jane Doe,10305751,LIC456,Lightning,H67890,Team A,Abu Dhabi Riding Club,Yes`;
 
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -440,15 +465,28 @@ export default function StartlistPage({
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Rider ID (FEI/Licence) *
+                    FEI ID
                   </label>
                   <input
                     type="text"
-                    value={formData.rider_id}
+                    value={formData.fei_id}
                     onChange={(e) =>
-                      setFormData({ ...formData, rider_id: e.target.value })
+                      setFormData({ ...formData, fei_id: e.target.value })
                     }
-                    required
+                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    License / Rider ID
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.license}
+                    onChange={(e) =>
+                      setFormData({ ...formData, license: e.target.value })
+                    }
                     className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500"
                   />
                 </div>
@@ -523,6 +561,21 @@ export default function StartlistPage({
                     required
                     className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500"
                   />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="is_handicap"
+                    checked={formData.is_handicap}
+                    onChange={(e) =>
+                      setFormData({ ...formData, is_handicap: e.target.checked })
+                    }
+                    className="w-5 h-5 rounded border-white/20 bg-white/10 text-purple-600 focus:ring-purple-500"
+                  />
+                  <label htmlFor="is_handicap" className="text-sm font-medium">
+                    H/C (Handicap) - Will appear at bottom of results
+                  </label>
                 </div>
               </div>
 

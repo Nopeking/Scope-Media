@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Play, Pause, Upload, Users, Eye, Settings, Archive, Search, Trophy } from 'lucide-react';
+import { Plus, Edit, Trash2, Play, Pause, Upload, Users, Eye, Settings, Archive, Search, Trophy, Flag, User } from 'lucide-react';
 import { LiveStream, ArchivedVideo } from '@/types';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -98,9 +98,16 @@ function AdminDashboardContent() {
     { id: 'users', label: 'Users', icon: Users },
     { id: 'personal-library', label: 'Personal Library', icon: Upload },
     { id: 'shows', label: 'Shows', icon: Trophy },
+    { id: 'riders', label: 'Riders', icon: User, external: '/admin/riders' },
+    { id: 'flags', label: 'Flags', icon: Flag, external: '/admin/flags' },
   ];
 
-  const handleTabChange = (tabId: string) => {
+  const handleTabChange = (tabId: string, external?: string) => {
+    if (external) {
+      // Navigate to external page
+      router.push(external);
+      return;
+    }
     setActiveTab(tabId);
     // Update URL without page refresh
     const url = new URL(window.location.href);
@@ -477,12 +484,14 @@ function AdminDashboardContent() {
             <nav className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 -mx-4 px-4 lg:mx-0 lg:px-0">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
+                const isExternal = 'external' in tab && tab.external;
+                const isActive = !isExternal && activeTab === tab.id;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
+                    onClick={() => handleTabChange(tab.id, isExternal ? tab.external : undefined)}
                     className={`flex items-center gap-2 lg:gap-3 px-3 py-2 lg:px-4 lg:py-3 rounded-lg text-left transition-colors whitespace-nowrap flex-shrink-0 lg:w-full text-sm lg:text-base ${
-                      activeTab === tab.id
+                      isActive
                         ? 'bg-primary text-white'
                         : 'text-slate-600 hover:bg-slate-100'
                     }`}

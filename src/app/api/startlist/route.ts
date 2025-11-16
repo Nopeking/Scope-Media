@@ -89,20 +89,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Prepare data for insertion
-    const startlistData = entries.map((entry: any) => ({
-      class_id: entry.class_id,
-      rider_name: entry.rider_name,
-      rider_id: entry.rider_id || null,
-      fei_id: entry.fei_id || null,
-      license: entry.license || null,
-      horse_name: entry.horse_name,
-      horse_id: entry.horse_id || null,
-      team_name: entry.team_name || null,
-      club_name: entry.club_name || null,
-      start_order: entry.start_order,
-      updated_at: new Date().toISOString()
-    }));
+    // Prepare data for insertion with country lookup from riders table
+    const startlistDataPromises = entries.map(async (entry: any) => {
+      let countryCode = entry.country_code || null;
+      
+      // If FEI ID is provided, lookup country from riders table
+      if (entry.fei_id && !countryCode) {
+        try {
+          const { data: rider } = await supabaseAdmin
+            .from('riders')
+            .select('country')
+            .eq('fei_registration', entry.fei_id)
+            .single();
+          
+          if (rider && rider.country) {
+            countryCode = rider.country;
+          }
+        } catch (error) {
+          console.log(`Could not find rider with FEI ID: ${entry.fei_id}`);
+        }
+      }
+
+      return {
+        class_id: entry.class_id,
+        rider_name: entry.rider_name,
+        rider_id: entry.rider_id || null,
+        fei_id: entry.fei_id || null,
+        license: entry.license || null,
+        horse_name: entry.horse_name,
+        horse_id: entry.horse_id || null,
+        team_name: entry.team_name || null,
+        club_name: entry.club_name || null,
+        is_handicap: entry.is_handicap || false,
+        country_code: countryCode,
+        start_order: entry.start_order,
+        updated_at: new Date().toISOString()
+      };
+    });
+
+    const startlistData = await Promise.all(startlistDataPromises);
 
     const { data: startlist, error } = await supabaseAdmin
       .from('startlist')
