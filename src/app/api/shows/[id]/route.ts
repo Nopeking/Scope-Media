@@ -47,6 +47,41 @@ export async function GET(
       return NextResponse.json({ error: 'Show not found' }, { status: 404 });
     }
 
+    // Automatically update show status based on dates
+    if (show.status !== 'cancelled') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const startDate = new Date(show.start_date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(show.end_date);
+      endDate.setHours(0, 0, 0, 0);
+
+      let newStatus = show.status;
+
+      // Check if show should be ongoing
+      if (today >= startDate && today <= endDate && show.status === 'upcoming') {
+        newStatus = 'ongoing';
+      }
+      // Check if show should be completed
+      else if (today > endDate && show.status !== 'completed') {
+        newStatus = 'completed';
+      }
+
+      // Update if status changed
+      if (newStatus !== show.status) {
+        await supabaseAdmin
+          .from('shows')
+          .update({
+            status: newStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+        
+        show.status = newStatus;
+      }
+    }
+
     return NextResponse.json(show);
   } catch (error) {
     console.error('Error in GET /api/shows/[id]:', error);

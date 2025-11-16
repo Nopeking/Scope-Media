@@ -505,18 +505,22 @@ export default function ScoringPage({
       // Sort based on class rule
       if (classInfo?.class_rule === 'optimum_time' && classInfo?.optimum_time) {
         const optimumTime = classInfo.optimum_time;
-        // For optimum_time: Sort by faults first, then by absolute difference from optimum time
+        // Optimum Time: Sort by (faults, abs(time - optimum_time), time)
         return leaderboard.sort((a, b) => {
-          // First sort by total faults (0 faults rank higher)
+          // First: faults (ascending - lower faults first)
           if (a.total_faults !== b.total_faults) {
             return a.total_faults - b.total_faults;
           }
-          // Then sort by absolute difference from optimum time (closest to optimum wins)
+          // Second: absolute difference from optimum time (ascending - closest first)
           const timeA = a.time_taken || 999;
           const timeB = b.time_taken || 999;
           const diffA = Math.abs(timeA - optimumTime);
           const diffB = Math.abs(timeB - optimumTime);
-          return diffA - diffB;
+          if (diffA !== diffB) {
+            return diffA - diffB;
+          }
+          // Third: time as tiebreaker (ascending - faster first)
+          return timeA - timeB;
         });
       } else {
         // For other classes: Sort by faults first, then by time (fastest wins)

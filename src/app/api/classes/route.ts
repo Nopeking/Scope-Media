@@ -69,6 +69,55 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Automatically update class statuses based on date and time
+    if (classes && classes.length > 0) {
+      const now = new Date();
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+      const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
+
+      for (const classItem of classes) {
+        if (classItem.status === 'cancelled' || classItem.status === 'completed') continue;
+        if (!classItem.class_date || !classItem.start_time) continue;
+
+        const classDate = new Date(classItem.class_date);
+        classDate.setHours(0, 0, 0, 0);
+
+        let newStatus = classItem.status;
+
+        // Check if class date is today
+        const isToday = today.getTime() === classDate.getTime();
+
+        // Check if class should be ongoing
+        if (isToday && classItem.start_time && classItem.status === 'upcoming') {
+          // Compare current time with start time
+          const [startHour, startMinute] = classItem.start_time.split(':').map(Number);
+          const [currentHour, currentMinute] = currentTime.split(':').map(Number);
+          
+          const startTimeMinutes = startHour * 60 + startMinute;
+          const currentTimeMinutes = currentHour * 60 + currentMinute;
+
+          if (currentTimeMinutes >= startTimeMinutes) {
+            newStatus = 'ongoing';
+          }
+        }
+
+        // Update if status changed
+        if (newStatus !== classItem.status) {
+          await supabaseAdmin
+            .from('classes')
+            .update({
+              status: newStatus,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', classItem.id);
+          
+          // Update the class object in the response
+          classItem.status = newStatus;
+        }
+      }
+    }
+
     return NextResponse.json(classes);
   } catch (error) {
     console.error('Error in GET /api/classes:', error);

@@ -403,7 +403,7 @@ export interface Database {
           max_points: number;
           number_of_rounds: number;
           linked_stream_id: string | null;
-          status: 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
+          status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
           created_at: string;
           updated_at: string;
         };
@@ -424,7 +424,7 @@ export interface Database {
           max_points?: number;
           number_of_rounds?: number;
           linked_stream_id?: string | null;
-          status?: 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
+          status?: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
           created_at?: string;
           updated_at?: string;
         };
@@ -445,7 +445,7 @@ export interface Database {
           max_points?: number;
           number_of_rounds?: number;
           linked_stream_id?: string | null;
-          status?: 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
+          status?: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
           created_at?: string;
           updated_at?: string;
         };

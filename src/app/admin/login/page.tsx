@@ -20,7 +20,8 @@ function AdminLoginForm() {
   const { adminLogin } = useAdminAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirectTo') || '/admin/shows';
+  const redirectTo = searchParams.get('redirectTo') || '/admin/dashboard';
+  const expired = searchParams.get('expired') === 'true';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +75,15 @@ function AdminLoginForm() {
               Sign in to manage your content
             </p>
           </div>
+
+          {/* Session Expired Message */}
+          {expired && (
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                <strong>Session Expired:</strong> Your session has expired due to inactivity (60 minutes). Please sign in again.
+              </p>
+            </div>
+          )}
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">

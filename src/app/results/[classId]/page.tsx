@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Clock, ArrowRight } from 'lucide-react';
+import { Trophy, Clock, ArrowRight, CheckCircle } from 'lucide-react';
 
 interface StartlistEntry {
   id: string;
@@ -14,6 +14,8 @@ interface StartlistEntry {
   horse_name: string;
   team_name: string | null;
   club_name: string | null;
+  is_handicap: boolean;
+  country_code: string | null;
   start_order: number;
 }
 
@@ -31,6 +33,9 @@ interface Score {
 interface ClassData {
   id: string;
   class_name: string;
+  status: string;
+  class_rule: string;
+  optimum_time: number | null;
   shows: {
     name: string;
   };
@@ -44,6 +49,7 @@ export default function ResultsPage() {
   const [startlist, setStartlist] = useState<StartlistEntry[]>([]);
   const [scores, setScores] = useState<Record<string, Score>>({});
   const [loading, setLoading] = useState(true);
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -85,21 +91,62 @@ export default function ResultsPage() {
   };
 
   const getLeaderboard = () => {
-    return Object.values(scores)
+    const scoredEntries = Object.values(scores)
       .filter((score) => score.status === 'completed')
-      .sort((a, b) => {
-        if (a.total_faults !== b.total_faults) {
-          return a.total_faults - b.total_faults;
-        }
-        return (a.time_taken || 999) - (b.time_taken || 999);
-      })
       .map((score) => {
         const entry = startlist.find((e) => e.id === score.startlist_id);
+        if (!entry) return null;
         return {
           ...entry,
           score,
         };
-      });
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+
+    // Separate H/C and regular riders
+    const regularRiders = scoredEntries.filter((item) => !item.is_handicap);
+    const handicapRiders = scoredEntries.filter((item) => item.is_handicap);
+
+    // Sort function based on class rule
+    const sortRiders = (riders: typeof regularRiders) => {
+      if (classData?.class_rule === 'optimum_time' && classData?.optimum_time) {
+        // Optimum Time: Sort by (faults, abs(time - optimum_time), time)
+        const optimumTime = classData.optimum_time;
+        return riders.sort((a, b) => {
+          // First: faults (ascending - lower faults first)
+          if (a.score.total_faults !== b.score.total_faults) {
+            return a.score.total_faults - b.score.total_faults;
+          }
+          // Second: absolute difference from optimum time (ascending - closest first)
+          const timeA = a.score.time_taken || 999;
+          const timeB = b.score.time_taken || 999;
+          const diffA = Math.abs(timeA - optimumTime);
+          const diffB = Math.abs(timeB - optimumTime);
+          if (diffA !== diffB) {
+            return diffA - diffB;
+          }
+          // Third: time as tiebreaker (ascending - faster first)
+          return timeA - timeB;
+        });
+      } else {
+        // Other class rules: Sort by faults first, then by time (fastest wins)
+        return riders.sort((a, b) => {
+          if (a.score.total_faults !== b.score.total_faults) {
+            return a.score.total_faults - b.score.total_faults;
+          }
+          return (a.score.time_taken || 999) - (b.score.time_taken || 999);
+        });
+      }
+    };
+
+    // Sort regular riders
+    const sortedRegular = sortRiders(regularRiders);
+
+    // Sort H/C riders (they'll appear at bottom)
+    const sortedHandicap = sortRiders(handicapRiders);
+
+    // Return regular riders first, then H/C riders at bottom
+    return [...sortedRegular, ...sortedHandicap];
   };
 
   const getNextRider = () => {
@@ -109,6 +156,35 @@ export default function ResultsPage() {
 
   const getRemainingRiders = () => {
     return startlist.filter((entry) => !scores[entry.id]);
+  };
+
+  const handleCompleteClass = async () => {
+    if (!confirm('Are you sure you want to mark this class as completed?')) {
+      return;
+    }
+
+    try {
+      setCompleting(true);
+      const response = await fetch(`/api/classes/${classId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      });
+
+      if (response.ok) {
+        const updatedClass = await response.json();
+        setClassData(updatedClass);
+        alert('Class marked as completed!');
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.error || 'Failed to complete class'}`);
+      }
+    } catch (error) {
+      console.error('Error completing class:', error);
+      alert('Error completing class');
+    } finally {
+      setCompleting(false);
+    }
   };
 
   if (loading) {
@@ -131,7 +207,29 @@ export default function ResultsPage() {
           <h1 className="text-4xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
             {classData?.class_name}
           </h1>
-          <p className="text-xl text-gray-400">{classData?.shows.name}</p>
+          <p className="text-xl text-gray-400 mb-4">{classData?.shows.name}</p>
+          
+          {/* Complete Class Button */}
+          {classData && (
+            <div className="flex items-center justify-center gap-4">
+              {classData.status !== 'completed' && (
+                <button
+                  onClick={handleCompleteClass}
+                  disabled={completing}
+                  className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  {completing ? 'Completing...' : 'Complete Class'}
+                </button>
+              )}
+              {classData.status === 'completed' && (
+                <span className="px-6 py-3 bg-green-600/20 border-2 border-green-500 rounded-lg text-green-400 flex items-center gap-2 font-semibold">
+                  <CheckCircle className="w-5 h-5" />
+                  Class Completed
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Next Rider - Highlighted */}

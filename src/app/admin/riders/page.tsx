@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, RefreshCw, Trash2, CheckCircle, XCircle, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Loader2, RefreshCw, Trash2, CheckCircle, XCircle, Users, ArrowLeft } from 'lucide-react';
 import type { Rider } from '@/types';
 
 export default function RidersAdmin() {
+  const router = useRouter();
   const [riders, setRiders] = useState<Rider[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -121,12 +123,22 @@ export default function RidersAdmin() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Riders Management
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage equestrian riders synced from UAE ERF
-          </p>
+          <div className="flex items-center gap-4 mb-2">
+            <button
+              onClick={() => router.push('/admin/dashboard')}
+              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition"
+            >
+              <ArrowLeft className="w-6 h-6 text-gray-900 dark:text-white" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                Riders Management
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Manage equestrian riders synced from UAE ERF
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}

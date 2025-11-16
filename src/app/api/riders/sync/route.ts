@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const contentType = response.headers.get('content-type');
+    const contentType = response.headers.get('content-type') || '';
     console.log('Response content-type:', contentType);
 
     let ridersData: ApiRider[] = [];
@@ -78,81 +78,138 @@ export async function POST(request: NextRequest) {
     const responseText = await response.text();
     console.log('Response preview:', responseText.substring(0, 500));
 
-    // Try to parse as XML (SOAP response)
-    try {
-      const xmlData = await parseStringPromise(responseText);
-      console.log('Parsed XML structure:', JSON.stringify(xmlData, null, 2).substring(0, 500));
+    // Check if response is JSON or XML based on content-type and first character
+    const isJson = contentType.includes('json') || responseText.trim().startsWith('{') || responseText.trim().startsWith('[');
+    const isXml = contentType.includes('xml') || responseText.trim().startsWith('<');
 
-      // Extract riders from XML
-      // The structure might be: <getRiderListResponse><getRiderListResult>...</getRiderListResult></getRiderListResponse>
-      // or similar SOAP envelope
-      if (xmlData && typeof xmlData === 'object') {
-        // Try to find the array of riders in the XML structure
-        const extractRiders = (obj: any): any[] => {
-          if (Array.isArray(obj)) {
-            return obj;
-          }
-          if (obj && typeof obj === 'object') {
-            // Look for common patterns
-            for (const key of Object.keys(obj)) {
-              if (key.toLowerCase().includes('rider') || key.toLowerCase().includes('result')) {
-                const result = extractRiders(obj[key]);
-                if (result.length > 0) return result;
-              }
-            }
-            // Try all values
-            for (const value of Object.values(obj)) {
-              const result = extractRiders(value);
-              if (result.length > 0) return result;
-            }
-          }
-          return [];
-        };
-
-        ridersData = extractRiders(xmlData);
-        console.log(`Extracted ${ridersData.length} riders from XML`);
-      }
-
-      if (ridersData.length === 0) {
-        return NextResponse.json(
-          {
-            error: 'No riders found in XML response',
-            xmlStructure: JSON.stringify(xmlData).substring(0, 300),
-            hint: 'The XML structure may be different than expected'
-          },
-          { status: 500 }
-        );
-      }
-    } catch (xmlError) {
-      console.error('XML parsing error:', xmlError);
-
-      // Try parsing as JSON as fallback
+    if (isJson) {
+      // Parse as JSON first (most common case)
       try {
         const jsonData = JSON.parse(responseText);
         if (jsonData.riders && Array.isArray(jsonData.riders)) {
           ridersData = jsonData.riders;
         } else if (Array.isArray(jsonData)) {
           ridersData = jsonData;
+        } else if (jsonData.data && Array.isArray(jsonData.data)) {
+          ridersData = jsonData.data;
         } else {
           return NextResponse.json(
             {
-              error: 'Could not parse as XML or JSON',
+              error: 'JSON response does not contain riders array',
+              structure: Object.keys(jsonData),
               preview: responseText.substring(0, 200)
             },
             { status: 500 }
           );
         }
+        console.log(`Successfully parsed ${ridersData.length} riders from JSON`);
       } catch (jsonError) {
+        console.error('JSON parsing error:', jsonError);
         return NextResponse.json(
           {
-            error: 'Unable to parse response',
-            contentType,
-            preview: responseText.substring(0, 200),
-            xmlError: xmlError instanceof Error ? xmlError.message : 'Unknown',
-            hint: 'The API response format is not recognized'
+            error: 'Failed to parse JSON response',
+            details: jsonError instanceof Error ? jsonError.message : 'Unknown error',
+            preview: responseText.substring(0, 200)
           },
           { status: 500 }
         );
+      }
+    } else if (isXml) {
+      // Try to parse as XML (SOAP response)
+      try {
+        const xmlData = await parseStringPromise(responseText);
+        console.log('Parsed XML structure:', JSON.stringify(xmlData, null, 2).substring(0, 500));
+
+        // Extract riders from XML
+        // The structure might be: <getRiderListResponse><getRiderListResult>...</getRiderListResult></getRiderListResponse>
+        // or similar SOAP envelope
+        if (xmlData && typeof xmlData === 'object') {
+          // Try to find the array of riders in the XML structure
+          const extractRiders = (obj: any): any[] => {
+            if (Array.isArray(obj)) {
+              return obj;
+            }
+            if (obj && typeof obj === 'object') {
+              // Look for common patterns
+              for (const key of Object.keys(obj)) {
+                if (key.toLowerCase().includes('rider') || key.toLowerCase().includes('result')) {
+                  const result = extractRiders(obj[key]);
+                  if (result.length > 0) return result;
+                }
+              }
+              // Try all values
+              for (const value of Object.values(obj)) {
+                const result = extractRiders(value);
+                if (result.length > 0) return result;
+              }
+            }
+            return [];
+          };
+
+          ridersData = extractRiders(xmlData);
+          console.log(`Extracted ${ridersData.length} riders from XML`);
+        }
+
+        if (ridersData.length === 0) {
+          return NextResponse.json(
+            {
+              error: 'No riders found in XML response',
+              xmlStructure: JSON.stringify(xmlData).substring(0, 300),
+              hint: 'The XML structure may be different than expected'
+            },
+            { status: 500 }
+          );
+        }
+      } catch (xmlError) {
+        console.error('XML parsing error:', xmlError);
+        return NextResponse.json(
+          {
+            error: 'Failed to parse XML response',
+            details: xmlError instanceof Error ? xmlError.message : 'Unknown error',
+            preview: responseText.substring(0, 200)
+          },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Unknown format, try both
+      try {
+        const jsonData = JSON.parse(responseText);
+        if (jsonData.riders && Array.isArray(jsonData.riders)) {
+          ridersData = jsonData.riders;
+        } else if (Array.isArray(jsonData)) {
+          ridersData = jsonData;
+        } else if (jsonData.data && Array.isArray(jsonData.data)) {
+          ridersData = jsonData.data;
+        }
+      } catch {
+        // Not JSON, try XML
+        try {
+          const xmlData = await parseStringPromise(responseText);
+          // Extract riders from XML (same logic as above)
+          const extractRiders = (obj: any): any[] => {
+            if (Array.isArray(obj)) return obj;
+            if (obj && typeof obj === 'object') {
+              for (const key of Object.keys(obj)) {
+                if (key.toLowerCase().includes('rider') || key.toLowerCase().includes('result')) {
+                  const result = extractRiders(obj[key]);
+                  if (result.length > 0) return result;
+                }
+              }
+            }
+            return [];
+          };
+          ridersData = extractRiders(xmlData);
+        } catch {
+          return NextResponse.json(
+            {
+              error: 'Unable to parse response as JSON or XML',
+              contentType,
+              preview: responseText.substring(0, 200)
+            },
+            { status: 500 }
+          );
+        }
       }
     }
 

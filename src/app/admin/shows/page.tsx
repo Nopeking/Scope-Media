@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Plus, Edit, Trash2, Calendar, MapPin, Trophy, ChevronRight,
-  Users, List, Upload, BarChart3, Clock, Target
+  Users, List, Upload, BarChart3, Clock, Target, ArrowLeft
 } from 'lucide-react';
 import { Show, Class } from '@/types';
 import Link from 'next/link';
@@ -24,6 +25,7 @@ const CLASS_RULES = [
 ];
 
 export default function ShowsManagementPage() {
+  const router = useRouter();
   const [shows, setShows] = useState<Show[]>([]);
   const [selectedShow, setSelectedShow] = useState<Show | null>(null);
   const [showClasses, setShowClasses] = useState<Class[]>([]);
@@ -301,16 +303,19 @@ export default function ShowsManagementPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <div className="flex items-center gap-2 text-sm text-slate-600 mb-4">
-            <Link href="/admin/dashboard" className="hover:text-blue-600">Admin Dashboard</Link>
-            <ChevronRight className="h-4 w-4" />
-            <span className="text-slate-900 font-medium">Shows Management</span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
+          <div className="flex items-center gap-4 mb-4">
+            <button
+              onClick={() => router.push('/admin/dashboard')}
+              className="p-2 hover:bg-slate-200 rounded-lg transition"
+            >
+              <ArrowLeft className="w-6 h-6 text-slate-800" />
+            </button>
+            <div className="flex-1">
               <h1 className="text-3xl font-bold text-slate-800">Show Jumping Competitions</h1>
               <p className="text-slate-600 mt-1">Manage shows, classes, startlists, and live scoring</p>
             </div>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
             <button
               onClick={() => {
                 setEditingShow(null);
@@ -457,7 +462,7 @@ export default function ShowsManagementPage() {
                             </div>
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
                               classItem.status === 'upcoming' ? 'bg-blue-100 text-blue-700' :
-                              classItem.status === 'in_progress' ? 'bg-green-100 text-green-700' :
+                              classItem.status === 'ongoing' ? 'bg-green-100 text-green-700' :
                               classItem.status === 'completed' ? 'bg-slate-100 text-slate-700' :
                               'bg-red-100 text-red-700'
                             }`}>
