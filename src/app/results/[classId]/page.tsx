@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Clock, ArrowRight, CheckCircle } from 'lucide-react';
+import { Trophy, Clock, ArrowRight } from 'lucide-react';
 
 interface StartlistEntry {
   id: string;
@@ -27,6 +27,7 @@ interface Score {
   time_faults: number;
   jumping_faults: number;
   total_faults: number;
+  points: number;
   status: string;
 }
 
@@ -49,7 +50,6 @@ export default function ResultsPage() {
   const [startlist, setStartlist] = useState<StartlistEntry[]>([]);
   const [scores, setScores] = useState<Record<string, Score>>({});
   const [loading, setLoading] = useState(true);
-  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -92,7 +92,6 @@ export default function ResultsPage() {
 
   const getLeaderboard = () => {
     const scoredEntries = Object.values(scores)
-      .filter((score) => score.status === 'completed')
       .map((score) => {
         const entry = startlist.find((e) => e.id === score.startlist_id);
         if (!entry) return null;
@@ -109,10 +108,24 @@ export default function ResultsPage() {
 
     // Sort function based on class rule
     const sortRiders = (riders: typeof regularRiders) => {
-      if (classData?.class_rule === 'optimum_time' && classData?.optimum_time) {
+      // Separate completed and non-completed riders
+      const completedRiders = riders.filter(item => item.score.status === 'completed');
+      const nonCompletedRiders = riders.filter(item => item.score.status !== 'completed');
+
+      if (classData?.class_rule === 'accumulator') {
+        // Accumulator: Sort by points (descending - higher points first), then by time (ascending - faster first)
+        completedRiders.sort((a, b) => {
+          const pointsA = a.score.points || 0;
+          const pointsB = b.score.points || 0;
+          if (pointsA !== pointsB) {
+            return pointsB - pointsA; // Descending
+          }
+          return (a.score.time_taken || 999) - (b.score.time_taken || 999); // Ascending
+        });
+      } else if (classData?.class_rule === 'optimum_time' && classData?.optimum_time) {
         // Optimum Time: Sort by (faults, abs(time - optimum_time), time)
         const optimumTime = classData.optimum_time;
-        return riders.sort((a, b) => {
+        completedRiders.sort((a, b) => {
           // First: faults (ascending - lower faults first)
           if (a.score.total_faults !== b.score.total_faults) {
             return a.score.total_faults - b.score.total_faults;
@@ -130,13 +143,16 @@ export default function ResultsPage() {
         });
       } else {
         // Other class rules: Sort by faults first, then by time (fastest wins)
-        return riders.sort((a, b) => {
+        completedRiders.sort((a, b) => {
           if (a.score.total_faults !== b.score.total_faults) {
             return a.score.total_faults - b.score.total_faults;
           }
           return (a.score.time_taken || 999) - (b.score.time_taken || 999);
         });
       }
+
+      // Return completed riders first, then non-completed at bottom
+      return [...completedRiders, ...nonCompletedRiders];
     };
 
     // Sort regular riders
@@ -156,35 +172,6 @@ export default function ResultsPage() {
 
   const getRemainingRiders = () => {
     return startlist.filter((entry) => !scores[entry.id]);
-  };
-
-  const handleCompleteClass = async () => {
-    if (!confirm('Are you sure you want to mark this class as completed?')) {
-      return;
-    }
-
-    try {
-      setCompleting(true);
-      const response = await fetch(`/api/classes/${classId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed' }),
-      });
-
-      if (response.ok) {
-        const updatedClass = await response.json();
-        setClassData(updatedClass);
-        alert('Class marked as completed!');
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.error || 'Failed to complete class'}`);
-      }
-    } catch (error) {
-      console.error('Error completing class:', error);
-      alert('Error completing class');
-    } finally {
-      setCompleting(false);
-    }
   };
 
   if (loading) {
@@ -207,29 +194,7 @@ export default function ResultsPage() {
           <h1 className="text-4xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
             {classData?.class_name}
           </h1>
-          <p className="text-xl text-gray-400 mb-4">{classData?.shows.name}</p>
-          
-          {/* Complete Class Button */}
-          {classData && (
-            <div className="flex items-center justify-center gap-4">
-              {classData.status !== 'completed' && (
-                <button
-                  onClick={handleCompleteClass}
-                  disabled={completing}
-                  className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  {completing ? 'Completing...' : 'Complete Class'}
-                </button>
-              )}
-              {classData.status === 'completed' && (
-                <span className="px-6 py-3 bg-green-600/20 border-2 border-green-500 rounded-lg text-green-400 flex items-center gap-2 font-semibold">
-                  <CheckCircle className="w-5 h-5" />
-                  Class Completed
-                </span>
-              )}
-            </div>
-          )}
+          <p className="text-xl text-gray-400">{classData?.shows.name}</p>
         </div>
 
         {/* Next Rider - Highlighted */}
@@ -295,13 +260,37 @@ export default function ResultsPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-yellow-400">
-                      {entry.score.total_faults} F
-                    </div>
-                    <div className="text-sm text-gray-300 flex items-center gap-1 justify-end">
-                      <Clock className="w-3 h-3" />
-                      {entry.score.time_taken?.toFixed(2)}s
-                    </div>
+                    {entry.score.status !== 'completed' ? (
+                      <div className={`text-xl font-bold uppercase ${
+                        entry.score.status === 'eliminated' ? 'text-red-400' :
+                        entry.score.status === 'retired' ? 'text-orange-400' :
+                        entry.score.status === 'withdrawn' ? 'text-gray-400' :
+                        entry.score.status === 'canceled' ? 'text-red-500' :
+                        'text-gray-400'
+                      }`}>
+                        {entry.score.status}
+                      </div>
+                    ) : classData?.class_rule === 'accumulator' ? (
+                      <>
+                        <div className="text-2xl font-bold text-green-400">
+                          {entry.score.points} pts
+                        </div>
+                        <div className="text-sm text-gray-300 flex items-center gap-1 justify-end">
+                          <Clock className="w-3 h-3" />
+                          {entry.score.time_taken?.toFixed(2)}s
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-2xl font-bold text-yellow-400">
+                          {entry.score.total_faults} F
+                        </div>
+                        <div className="text-sm text-gray-300 flex items-center gap-1 justify-end">
+                          <Clock className="w-3 h-3" />
+                          {entry.score.time_taken?.toFixed(2)}s
+                        </div>
+                      </>
+                    )}
                   </div>
                 </motion.div>
               ))}

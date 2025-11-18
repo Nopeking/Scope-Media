@@ -16,6 +16,15 @@ export default function LinkRiderPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [linkedRiders, setLinkedRiders] = useState<LinkedRider[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAdditionalDetailsModal, setShowAdditionalDetailsModal] = useState(false);
+  const [feiRiderData, setFeiRiderData] = useState<{ full_name: string; fei_registration: string } | null>(null);
+  const [additionalDetails, setAdditionalDetails] = useState({
+    first_name: '',
+    last_name: '',
+    licence: 'EEF-SJR-',
+    country: '',
+    club_name: ''
+  });
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -56,6 +65,7 @@ export default function LinkRiderPage() {
     setMessage(null);
 
     try {
+      // First, try to link rider from local database
       const response = await fetch('/api/riders/link', {
         method: 'POST',
         headers: {
@@ -74,11 +84,99 @@ export default function LinkRiderPage() {
         setFeiRegistration('');
         // Refresh linked riders
         fetchLinkedRiders(user.id);
+      } else if (response.status === 404) {
+        // Rider not found locally, fetch from FEI
+        console.log('Rider not found locally, fetching from FEI...');
+        await fetchRiderFromFEI(feiRegistration);
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to link rider' });
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'An error occurred while linking rider' });
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRiderFromFEI = async (feiReg: string) => {
+    // FEI website is protected by Cloudflare, so we'll ask user to enter details manually
+    setFeiRiderData({ full_name: '', fei_registration: feiReg });
+    setAdditionalDetails({ first_name: '', last_name: '', licence: 'EEF-SJR-', country: '', club_name: '' });
+    setShowAdditionalDetailsModal(true);
+  };
+
+  const handleLicenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const prefix = 'EEF-SJR-';
+
+    // Always maintain the prefix
+    if (value.startsWith(prefix)) {
+      setAdditionalDetails({ ...additionalDetails, licence: value });
+    } else {
+      setAdditionalDetails({ ...additionalDetails, licence: prefix });
+    }
+  };
+
+  const handleCreateRiderWithDetails = async () => {
+    if (!user || !feiRiderData) return;
+
+    // Validate required fields
+    if (!additionalDetails.first_name.trim()) {
+      setMessage({ type: 'error', text: 'Please enter the first name' });
+      return;
+    }
+
+    if (!additionalDetails.last_name.trim()) {
+      setMessage({ type: 'error', text: 'Please enter the last name' });
+      return;
+    }
+
+    if (!additionalDetails.licence.trim() || additionalDetails.licence === 'EEF-SJR-') {
+      setMessage({ type: 'error', text: 'Please enter the rider licence number' });
+      return;
+    }
+
+    if (!additionalDetails.country.trim()) {
+      setMessage({ type: 'error', text: 'Please enter the country' });
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/riders/create-from-fei', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          first_name: additionalDetails.first_name,
+          last_name: additionalDetails.last_name,
+          fei_registration: feiRiderData.fei_registration,
+          licence: additionalDetails.licence,
+          country: additionalDetails.country,
+          club_name: additionalDetails.club_name,
+          user_id: user.id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'Rider created and linked successfully!' });
+        setFeiRegistration('');
+        setShowAdditionalDetailsModal(false);
+        setFeiRiderData(null);
+        setAdditionalDetails({ first_name: '', last_name: '', licence: 'EEF-SJR-', country: '', club_name: '' });
+        // Refresh linked riders
+        fetchLinkedRiders(user.id);
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to create rider' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'An error occurred while creating rider' });
       console.error('Error:', error);
     } finally {
       setLoading(false);
@@ -307,6 +405,145 @@ export default function LinkRiderPage() {
           isOpen={showAuthModal}
           onClose={() => setShowAuthModal(false)}
         />
+
+        {/* Additional Details Modal */}
+        {showAdditionalDetailsModal && feiRiderData && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-md">
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-slate-800 mb-4">Create Rider Profile</h2>
+                <p className="text-slate-600 mb-4">
+                  Rider not found in our database. Please enter the rider details to create the profile.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Tip:</strong> Check{' '}
+                    <a
+                      href={`https://www.fei.org/athlete/${feiRiderData.fei_registration}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-blue-900"
+                    >
+                      FEI profile
+                    </a>{' '}
+                    for rider details.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      FEI Registration
+                    </label>
+                    <input
+                      type="text"
+                      value={feiRiderData.fei_registration}
+                      disabled
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md bg-slate-100 text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      First Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={additionalDetails.first_name}
+                      onChange={(e) => setAdditionalDetails({ ...additionalDetails, first_name: e.target.value })}
+                      placeholder="e.g., John"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Last Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={additionalDetails.last_name}
+                      onChange={(e) => setAdditionalDetails({ ...additionalDetails, last_name: e.target.value })}
+                      placeholder="e.g., Smith"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Rider Licence Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={additionalDetails.licence}
+                      onChange={handleLicenceChange}
+                      placeholder="EEF-SJR-XXXXXXX"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Country <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={additionalDetails.country}
+                      onChange={(e) => setAdditionalDetails({ ...additionalDetails, country: e.target.value })}
+                      placeholder="e.g., Ireland or IRL"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800"
+                      required
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Enter full country name (e.g., &quot;United Kingdom&quot;) or 3-letter code (e.g., &quot;GBR&quot;)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Club Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={additionalDetails.club_name}
+                      onChange={(e) => setAdditionalDetails({ ...additionalDetails, club_name: e.target.value })}
+                      placeholder="e.g., Equestrian Club"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setShowAdditionalDetailsModal(false);
+                      setFeiRiderData(null);
+                      setAdditionalDetails({ first_name: '', last_name: '', licence: 'EEF-SJR-', country: '', club_name: '' });
+                    }}
+                    disabled={loading}
+                    className="flex-1 py-2 px-4 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateRiderWithDetails}
+                    disabled={loading}
+                    className={`flex-1 py-2 px-4 rounded-md font-semibold transition-colors ${
+                      loading
+                        ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    {loading ? 'Creating...' : 'Create & Link Rider'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

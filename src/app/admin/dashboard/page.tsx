@@ -234,7 +234,7 @@ function AdminDashboardContent() {
           url: formData.url,
           thumbnail: formData.thumbnail || `https://img.youtube.com/vi/${extractYouTubeId(formData.url)}/hqdefault.jpg`,
           duration: '00:00', // Placeholder, ideally fetched from YouTube API
-          category: formData.customTitle
+          customTitle: formData.customTitle
         };
         
         const response = await fetch('/api/videos', {
@@ -358,7 +358,7 @@ function AdminDashboardContent() {
         url: stream.url,
         thumbnail: stream.thumbnail,
         duration: '00:00',
-        category: customTitles.length > 0 ? customTitles[0] : 'Archived Streams'
+        customTitle: customTitles.length > 0 ? customTitles[0] : 'Archived Streams'
       };
 
       // Add to videos

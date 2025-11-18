@@ -58,6 +58,7 @@ export default function ShowsManagementPage() {
     time_allowed_round2: '',
     optimum_time: '',
     scoring_password: '',
+    display_link: '',
   });
 
   useEffect(() => {
@@ -222,6 +223,7 @@ export default function ShowsManagementPage() {
       time_allowed_round2: '',
       optimum_time: '',
       scoring_password: '',
+      display_link: '',
     });
   };
 
@@ -254,6 +256,7 @@ export default function ShowsManagementPage() {
       time_allowed_round2: classItem.time_allowed_round2?.toString() || '',
       optimum_time: classItem.optimum_time?.toString() || '',
       scoring_password: (classItem as any).scoring_password || '',
+      display_link: (classItem as any).display_link || '',
     });
     setClassModal(true);
   };
@@ -493,6 +496,29 @@ export default function ShowsManagementPage() {
                               </div>
                             )}
                           </div>
+
+                          {(classItem as any).display_link && (
+                            <div className="mb-3 p-2 bg-purple-50 rounded border border-purple-200">
+                              <p className="text-xs text-purple-700 font-medium mb-1">Display Link:</p>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={(classItem as any).display_link}
+                                  readOnly
+                                  className="flex-1 text-xs px-2 py-1 bg-white border border-purple-200 rounded"
+                                />
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText((classItem as any).display_link);
+                                    alert('Display link copied to clipboard!');
+                                  }}
+                                  className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs transition-colors"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                            </div>
+                          )}
 
                           <div className="flex gap-2">
                             <Link
@@ -816,6 +842,18 @@ export default function ShowsManagementPage() {
                       placeholder="Enter password for public scoring access"
                     />
                     <p className="text-xs text-slate-500 mt-1">Set a password to protect the public scoring page for spectators</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Display/Result Link (Optional)</label>
+                    <input
+                      type="text"
+                      value={classFormData.display_link}
+                      onChange={(e) => setClassFormData({ ...classFormData, display_link: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., https://example.com/display/class-id"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Link to display page for live/past show videos - easy to update anytime</p>
                   </div>
                 </div>
 

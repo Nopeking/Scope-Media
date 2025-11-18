@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Lock, RefreshCw, Trophy, Clock, Save, Settings, AlertCircle } from 'lucide-react';
+import { Lock, RefreshCw, Trophy, Clock, Save, Settings, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface StartlistEntry {
   id: string;
@@ -47,7 +47,7 @@ const STATUS_OPTIONS = [
   { value: 'retired', label: 'Retired', color: 'orange' },
   { value: 'eliminated', label: 'Eliminated', color: 'red' },
   { value: 'withdrawn', label: 'Withdrawn', color: 'gray' },
-  { value: 'disqualified', label: 'Disqualified', color: 'red' },
+  { value: 'canceled', label: 'Canceled', color: 'red' },
 ];
 
 export default function PublicScoringPage() {
@@ -63,6 +63,7 @@ export default function PublicScoringPage() {
   const [scores, setScores] = useState<Record<string, Score>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   // Local time allowed state (can be updated before scoring)
   const [timeAllowed, setTimeAllowed] = useState<string>('');
@@ -73,11 +74,15 @@ export default function PublicScoringPage() {
   const isRegularTwoPhase = classData?.class_rule === 'two_phases';
   const isSpecialTwoPhase = classData?.class_rule === 'special_two_phases';
 
+  // Check if this is an accumulator class
+  const isAccumulator = classData?.class_rule === 'accumulator';
+
   // Scoring form state for each rider
   const [scoringData, setScoringData] = useState<Record<string, {
     time_taken: string;
     jumping_faults: string;
     time_faults: string;
+    points: string; // For accumulator class
     status: string;
     notes: string;
     // Phase 2 data (for two-phase classes)
@@ -195,6 +200,7 @@ export default function PublicScoringPage() {
               time_taken: score.time_taken != null ? score.time_taken.toString() : '',
               jumping_faults: score.jumping_faults != null ? score.jumping_faults.toString() : '0',
               time_faults: score.time_faults != null ? score.time_faults.toString() : '0',
+              points: score.points != null ? score.points.toString() : '',
               status: score.status || 'completed',
               notes: score.notes != null ? score.notes : '',
             };
@@ -330,6 +336,60 @@ export default function PublicScoringPage() {
           await fetchScoringData();
           alert('Two-phase score saved successfully!');
         }
+      } else if (isAccumulator) {
+        // For accumulator class
+        const timeTaken = parseFloat(data.time_taken) || null;
+        let points = parseInt(data.points) || 0;
+
+        // Apply time penalty if time exceeded
+        if (classData?.time_allowed && timeTaken) {
+          const overtime = timeTaken - classData.time_allowed;
+          if (overtime > 0) {
+            // Deduct 1 point per second over time allowed (can go negative)
+            points = points - Math.ceil(overtime);
+          }
+        }
+
+        const scoreData = {
+          startlist_id: startlistId,
+          class_id: classId,
+          round_number: 1,
+          time_taken: timeTaken,
+          points: points,
+          jumping_faults: 0,
+          time_faults: 0,
+          total_faults: 0,
+          status: data.status,
+          notes: data.notes || null,
+        };
+
+        const existingScore = scores[startlistId];
+
+        if (existingScore) {
+          // Update existing score
+          const response = await fetch(`/api/scores?id=${existingScore.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(scoreData),
+          });
+
+          if (response.ok) {
+            await fetchScoringData();
+            alert('Accumulator score updated successfully!');
+          }
+        } else {
+          // Create new score
+          const response = await fetch('/api/scores', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(scoreData),
+          });
+
+          if (response.ok) {
+            await fetchScoringData();
+            alert('Accumulator score saved successfully!');
+          }
+        }
       } else {
         // For non-two-phase classes, save single round
         const timeTaken = parseFloat(data.time_taken) || null;
@@ -397,6 +457,7 @@ export default function PublicScoringPage() {
         time_taken: '',
         jumping_faults: '0',
         time_faults: '0',
+        points: '',
         status: 'completed',
         notes: '',
         time_taken_phase2: '',
@@ -416,7 +477,6 @@ export default function PublicScoringPage() {
 
   const getLeaderboard = () => {
     const leaderboard = Object.values(scores)
-      .filter((score) => score.status === 'completed')
       .map((score) => {
         const entry = startlist.find((e) => e.id === score.startlist_id);
         return {
@@ -425,15 +485,29 @@ export default function PublicScoringPage() {
           horse_name: entry?.horse_name || '',
           club_name: entry?.club_name || '',
           total_faults: score.total_faults,
+          points: score.points,
           time_taken: score.time_taken,
+          status: score.status,
         };
       });
 
+    // Separate completed and non-completed riders
+    const completedRiders = leaderboard.filter(entry => entry.status === 'completed');
+    const nonCompletedRiders = leaderboard.filter(entry => entry.status !== 'completed');
+
     // Sort based on class rule
-    if (classData?.class_rule === 'optimum_time' && classData?.optimum_time) {
+    if (isAccumulator) {
+      // Accumulator: Sort by points (descending - higher points first), then by time (ascending - faster first)
+      completedRiders.sort((a, b) => {
+        if (a.points !== b.points) {
+          return b.points - a.points; // Descending
+        }
+        return (a.time_taken || 999) - (b.time_taken || 999); // Ascending
+      });
+    } else if (classData?.class_rule === 'optimum_time' && classData?.optimum_time) {
       const optimumTime = classData.optimum_time;
       // Optimum Time: Sort by (faults, abs(time - optimum_time), time)
-      return leaderboard.sort((a, b) => {
+      completedRiders.sort((a, b) => {
         // First: faults (ascending - lower faults first)
         if (a.total_faults !== b.total_faults) {
           return a.total_faults - b.total_faults;
@@ -451,12 +525,44 @@ export default function PublicScoringPage() {
       });
     } else {
       // For other classes: Sort by faults first, then by time (fastest wins)
-      return leaderboard.sort((a, b) => {
+      completedRiders.sort((a, b) => {
         if (a.total_faults !== b.total_faults) {
           return a.total_faults - b.total_faults;
         }
         return (a.time_taken || 999) - (b.time_taken || 999);
       });
+    }
+
+    // Return completed riders first, then non-completed at the bottom
+    return [...completedRiders, ...nonCompletedRiders];
+  };
+
+  const handleCompleteClass = async () => {
+    if (!confirm('Are you sure you want to mark this class as completed?')) {
+      return;
+    }
+
+    try {
+      setCompleting(true);
+      const response = await fetch(`/api/classes/${classId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      });
+
+      if (response.ok) {
+        const updatedClass = await response.json();
+        setClassData(updatedClass);
+        alert('Class marked as completed!');
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.error || 'Failed to complete class'}`);
+      }
+    } catch (error) {
+      console.error('Error completing class:', error);
+      alert('Error completing class');
+    } finally {
+      setCompleting(false);
     }
   };
 
@@ -666,55 +772,6 @@ export default function PublicScoringPage() {
           </div>
         </div>
 
-        {/* Leaderboard */}
-        {leaderboard.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white/10 backdrop-blur-md rounded-2xl p-6 mb-6 border border-white/20"
-          >
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <Trophy className="w-6 h-6 text-yellow-400" />
-              Current Rankings
-            </h2>
-            <div className="space-y-2">
-              {leaderboard.slice(0, 10).map((entry, index) => (
-                <div
-                  key={entry.startlist_id}
-                  className={`flex items-center justify-between p-4 rounded-lg ${
-                    index === 0 ? 'bg-yellow-500/20 border border-yellow-400/50' :
-                    index === 1 ? 'bg-gray-400/20 border border-gray-400/50' :
-                    index === 2 ? 'bg-orange-600/20 border border-orange-400/50' :
-                    'bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="text-2xl font-bold w-8">
-                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
-                    </div>
-                    <div>
-                      <div className="font-semibold">{entry.rider_name}</div>
-                      <div className="text-sm text-purple-200">{entry.horse_name}</div>
-                      {entry.club_name && (
-                        <div className="text-xs text-purple-300">{entry.club_name}</div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold">
-                      {entry.total_faults} F
-                    </div>
-                    <div className="text-sm text-purple-200 flex items-center gap-1 justify-end">
-                      <Clock className="w-3 h-3" />
-                      {entry.time_taken?.toFixed(2)}s
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
         {/* Scoring Table */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -740,6 +797,18 @@ export default function PublicScoringPage() {
                       )}
                     </th>
                     <th className="px-2 py-2 text-left w-12">Total</th>
+                    <th className="px-2 py-2 text-left w-24">Status</th>
+                    <th className="px-2 py-2 text-left w-32">Notes</th>
+                    <th className="px-2 py-2 text-right w-20">Action</th>
+                  </tr>
+                ) : isAccumulator ? (
+                  <tr>
+                    <th className="px-2 py-2 text-left w-10">#</th>
+                    <th className="px-2 py-2 text-left w-32">Rider</th>
+                    <th className="px-2 py-2 text-left w-28">Horse</th>
+                    <th className="px-2 py-2 text-left w-24">Club</th>
+                    <th className="px-2 py-2 text-left w-20">Time (s)</th>
+                    <th className="px-2 py-2 text-left w-20">Points</th>
                     <th className="px-2 py-2 text-left w-24">Status</th>
                     <th className="px-2 py-2 text-left w-32">Notes</th>
                     <th className="px-2 py-2 text-right w-20">Action</th>
@@ -778,6 +847,7 @@ export default function PublicScoringPage() {
                     time_taken: '',
                     jumping_faults: '0',
                     time_faults: '0',
+                    points: '',
                     status: 'completed',
                     notes: '',
                     time_taken_phase2: '',
@@ -792,6 +862,7 @@ export default function PublicScoringPage() {
                     time_taken: existingData.time_taken ?? '',
                     jumping_faults: existingData.jumping_faults ?? '0',
                     time_faults: existingData.time_faults ?? '0',
+                    points: existingData.points ?? '',
                     status: existingData.status ?? 'completed',
                     notes: existingData.notes ?? '',
                     time_taken_phase2: existingData.time_taken_phase2 ?? '',
@@ -889,6 +960,83 @@ export default function PublicScoringPage() {
 
                         <td className="px-2 py-2 font-bold text-yellow-400 text-sm">
                           {totalFaults}
+                        </td>
+
+                        <td className="px-2 py-2">
+                          <select
+                            value={data.status}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'status', e.target.value)
+                            }
+                            className="px-1 py-1 text-xs bg-white/10 border border-white/20 rounded focus:outline-none w-full"
+                          >
+                            {STATUS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value} className="bg-gray-900">
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+
+                        <td className="px-2 py-2">
+                          <input
+                            type="text"
+                            value={data.notes}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'notes', e.target.value)
+                            }
+                            className="w-full px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                            placeholder="Notes..."
+                          />
+                        </td>
+
+                        <td className="px-2 py-2 text-right">
+                          <button
+                            onClick={() => handleSaveScore(entry.id)}
+                            className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-500 rounded transition text-xs"
+                          >
+                            <Save className="w-3 h-3" />
+                            Save
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  } else if (isAccumulator) {
+                    // Accumulator class: points-based scoring
+                    return (
+                      <tr
+                        key={entry.id}
+                        className="border-t border-white/10 hover:bg-white/5"
+                      >
+                        <td className="px-2 py-2">{entry.start_order}</td>
+                        <td className="px-2 py-2 font-medium text-sm truncate" title={entry.rider_name}>{entry.rider_name}</td>
+                        <td className="px-2 py-2 text-sm truncate" title={entry.horse_name}>{entry.horse_name}</td>
+                        <td className="px-2 py-2 text-sm truncate">{entry.club_name || '-'}</td>
+
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={data.time_taken}
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'time_taken', e.target.value)
+                            }
+                            className="w-16 px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                            placeholder="0.00"
+                          />
+                        </td>
+
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            value={data.points || ''}
+                            max="65"
+                            onChange={(e) =>
+                              handleInputChange(entry.id, 'points', e.target.value)
+                            }
+                            className="w-16 px-1 py-1 text-sm bg-white/10 border border-white/20 rounded focus:outline-none focus:border-purple-500"
+                            placeholder="0-65"
+                          />
                         </td>
 
                         <td className="px-2 py-2">
@@ -1031,6 +1179,101 @@ export default function PublicScoringPage() {
             </table>
           </div>
         </motion.div>
+
+        {/* Current Rankings */}
+        {leaderboard.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/10 backdrop-blur-md rounded-2xl p-6 mt-6 border border-white/20"
+          >
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+              <Trophy className="w-6 h-6 text-yellow-400" />
+              Current Rankings
+            </h2>
+            <div className="space-y-2">
+              {leaderboard.slice(0, 10).map((entry, index) => (
+                <div
+                  key={entry.startlist_id}
+                  className={`flex items-center justify-between p-4 rounded-lg ${
+                    index === 0 ? 'bg-yellow-500/20 border border-yellow-400/50' :
+                    index === 1 ? 'bg-gray-400/20 border border-gray-400/50' :
+                    index === 2 ? 'bg-orange-600/20 border border-orange-400/50' :
+                    'bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="text-2xl font-bold w-8">
+                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
+                    </div>
+                    <div>
+                      <div className="font-semibold">{entry.rider_name}</div>
+                      <div className="text-sm text-purple-200">{entry.horse_name}</div>
+                      {entry.club_name && (
+                        <div className="text-xs text-purple-300">{entry.club_name}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {entry.status !== 'completed' ? (
+                      <div className={`text-xl font-bold uppercase ${
+                        entry.status === 'eliminated' ? 'text-red-400' :
+                        entry.status === 'retired' ? 'text-orange-400' :
+                        entry.status === 'withdrawn' ? 'text-gray-400' :
+                        entry.status === 'canceled' ? 'text-red-500' :
+                        'text-gray-400'
+                      }`}>
+                        {entry.status}
+                      </div>
+                    ) : isAccumulator ? (
+                      <>
+                        <div className="text-2xl font-bold text-green-400">
+                          {entry.points} pts
+                        </div>
+                        <div className="text-sm text-purple-200 flex items-center gap-1 justify-end">
+                          <Clock className="w-3 h-3" />
+                          {entry.time_taken?.toFixed(2)}s
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-2xl font-bold">
+                          {entry.total_faults} F
+                        </div>
+                        <div className="text-sm text-purple-200 flex items-center gap-1 justify-end">
+                          <Clock className="w-3 h-3" />
+                          {entry.time_taken?.toFixed(2)}s
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Complete Class Button */}
+        {classData && (
+          <div className="mt-8 flex items-center justify-center gap-4">
+            {classData.status !== 'completed' && (
+              <button
+                onClick={handleCompleteClass}
+                disabled={completing}
+                className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+              >
+                <CheckCircle className="w-5 h-5" />
+                {completing ? 'Completing...' : 'Complete Class'}
+              </button>
+            )}
+            {classData.status === 'completed' && (
+              <span className="px-6 py-3 bg-green-600/20 border-2 border-green-500 rounded-lg text-green-400 flex items-center gap-2 font-semibold">
+                <CheckCircle className="w-5 h-5" />
+                Class Completed
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
